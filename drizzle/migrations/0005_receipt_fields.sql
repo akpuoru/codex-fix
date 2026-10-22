@@ -1,0 +1,1 @@
+ALTER TABLE public.shipments ADD COLUMN sender_address text, ADD COLUMN sender_email text, ADD COLUMN recipient_email text, ADD COLUMN confirmed_at timestamptz;
