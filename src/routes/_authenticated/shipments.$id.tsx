@@ -3,13 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { CreditCard, Wallet, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { EventRail, ProgressBar, StatusPill } from "@/components/shipment-bits";
-import { ShipmentPay } from "@/components/shipment-pay";
 import { ShipmentTransfer } from "@/components/shipment-transfer";
 import { cancelShipment, getMyShipment } from "@/lib/shipments.functions";
 import { formatCents, STATUS_LABEL } from "@/lib/rates";
@@ -41,8 +39,6 @@ function ShipmentDetail() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [showCheckout, setShowCheckout] = useState(false);
-
-  const [payMode, setPayMode] = useState<"card" | "transfer">("card");
   const { data, isPending, error } = useQuery({
     queryKey: ["shipment", id],
     queryFn: () => fetchShipment({ data: { id } }),
@@ -136,33 +132,15 @@ function ShipmentDetail() {
             </div>
 
             {showCheckout && !shipment.paid_at && (
-              <div className="mb-8 space-y-5">
-                <div className="grid max-w-xl grid-cols-2 gap-3" role="group" aria-label="Payment method">
-                  {(["card", "transfer"] as const).map((k) => (
-                    <Button variant="outline"
-                      key={k}
-                      onClick={() => setPayMode(k)}
-                      aria-pressed={payMode === k}
-                      className={`h-20 justify-start gap-3 whitespace-normal rounded-md px-4 text-left shadow-none hover:bg-muted hover:text-foreground ${payMode === k ? "border-primary bg-primary/5 text-primary ring-1 ring-primary" : "bg-card text-muted-foreground"}`}
-                    >
-                      {k === "card" ? <CreditCard /> : <Wallet />}
-                      <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{k === "card" ? "Card payment" : "Transfer"}</span><span className="mt-1 block text-xs font-normal text-muted-foreground">{k === "card" ? "Debit or credit card" : "Bitcoin or USDT"}</span></span>
-                      {payMode === k && <CheckCircle2 />}
-                    </Button>
-                  ))}
-                </div>
-                {payMode === "card" ? (
-                  <ShipmentPay shipmentId={shipment.id} />
-                ) : (
-                  <ShipmentTransfer
-                    shipmentId={shipment.id}
-                    tracking={shipment.tracking_number}
-                    amount={formatCents(shipment.price_cents, shipment.currency)}
-                    submittedAt={shipment.transfer_submitted_at}
-                    submittedMethod={shipment.transfer_method}
-                    submittedRef={shipment.transfer_reference}
-                  />
-                )}
+              <div className="mb-8">
+                <ShipmentTransfer
+                  shipmentId={shipment.id}
+                  tracking={shipment.tracking_number}
+                  amount={formatCents(shipment.price_cents, shipment.currency)}
+                  submittedAt={shipment.transfer_submitted_at}
+                  submittedMethod={shipment.transfer_method}
+                  submittedRef={shipment.transfer_reference}
+                />
               </div>
             )}
 
