@@ -81,19 +81,19 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Bridgeway Freighting" },
+      { title: "Bridgeway · Flights and delivery" },
       {
         name: "description",
         content:
-          "Bridgeway Freighting moves parcels, luggage and freight across 140 international corridors with instant rates and live tracking.",
+          "Bridgeway helps you explore airline reservation holds and arrange or track international parcel, luggage and freight deliveries.",
       },
-      { property: "og:title", content: "Bridgeway Freighting" },
+      { property: "og:title", content: "Bridgeway · Flights and delivery" },
       {
         property: "og:description",
-        content: "Bridgeway Freighting — international courier, luggage and freight network.",
+        content: "Explore flights and connect international deliveries for parcels, luggage and freight.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "Bridgeway Freighting" },
+      { property: "og:site_name", content: "Bridgeway" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [

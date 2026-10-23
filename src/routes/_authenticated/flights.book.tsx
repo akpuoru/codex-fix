@@ -9,7 +9,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { createFlightHold, getFlightSeatMaps, listMyFlightBookings, searchFlightOffers, searchFlightPlaces } from "@/lib/flights.functions";
 
-export const Route = createFileRoute("/_authenticated/flights")({
+export const Route = createFileRoute("/_authenticated/flights/book")({
   head: () => ({
     meta: [
       { title: "Flight reservations · Bridgeway" },

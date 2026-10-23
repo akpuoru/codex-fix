@@ -38,11 +38,12 @@ export function SiteHeader() {
           </div>
           <div className="leading-none">
             <div className="notranslate font-display text-[15px] font-bold">BRIDGEWAY</div>
-            <div className="notranslate mt-1 text-[10px] font-bold tracking-[0.14em] text-accent">FREIGHTING</div>
+            <div className="notranslate mt-1 text-[10px] font-bold tracking-[0.14em] text-accent">FLIGHTS & FREIGHT</div>
           </div>
         </Link>
 
         <nav className="ml-4 hidden items-center gap-5 text-xs font-semibold text-muted-foreground lg:flex">
+          <a href="/flights" className="transition-colors hover:text-foreground">FLIGHTS</a>
           {NAV.map((item) => (
             <Link
               key={item.to}
@@ -53,7 +54,6 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
-          <a href="/flights" className="transition-colors hover:text-foreground">FLIGHTS</a>
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
@@ -100,12 +100,12 @@ export function SiteHeader() {
       </div>
       {menuOpen && (
         <nav className="grid border-t border-line bg-card px-4 py-3 lg:hidden">
+          <a href="/flights" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold">FLIGHTS</a>
           {NAV.map((item) => (
             <Link key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold last:border-0">
               {item.label}
             </Link>
           ))}
-          <a href="/flights" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold">FLIGHTS</a>
         </nav>
       )}
       <div className="h-1 bg-accent" />
