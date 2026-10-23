@@ -41,6 +41,31 @@ export const adminListShipments = createServerFn({ method: "GET" })
     });
   });
 
+export const adminListFlightBookings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+
+    // Flight bookings are readable by their owner under RLS. Use the server-only
+    // service client after the admin check to load the cross-customer operations list.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("flight_bookings")
+      .select("id, user_id, duffel_order_id, booking_reference, booking_references, status, itinerary, passengers, total_amount, total_currency, payment_required_by, price_guarantee_expires_at, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(`Unable to load flight reservations: ${error.message}`);
+
+    return (data ?? []).map((booking: any) => ({
+      ...booking,
+      status:
+        booking.status === "held" && !booking.payment_required_by
+          ? "needs_review"
+          : booking.status === "held" && new Date(booking.payment_required_by).getTime() <= Date.now()
+            ? "expired"
+            : booking.status,
+    }));
+  });
+
 const statuses = [
   "booked",
   "picked_up",

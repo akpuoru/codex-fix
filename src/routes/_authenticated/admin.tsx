@@ -10,7 +10,7 @@ import { useSession } from "@/hooks/use-session";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusDot, StatusPill } from "@/components/shipment-bits";
-import { adminListPeople, adminListShipments, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
+import { adminListPeople, adminListShipments, adminListFlightBookings, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
 import { CURRENCIES, formatCents, getPricing, STATUS_LABEL, type PricingConfig } from "@/lib/rates";
 import { adminSaveSettings, adminSaveTransferDetails, getTransferDetails, type TransferDetails } from "@/lib/settings.functions";
 import { adminForceLogout, adminListAccounts, adminSetAccountStatus } from "@/lib/accounts.functions";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
       { title: "Admin operations · Bridgeway Freighting" },
-      { name: "description", content: "Manage every Bridgeway Freighting shipment, status and location." },
+      { name: "description", content: "Manage Bridgeway Freighting shipments, flight reservations, and operations." },
       { property: "og:title", content: "Admin operations · Bridgeway Freighting" },
       { property: "og:description", content: "Operations console for Bridgeway Freighting staff." },
       { property: "og:type", content: "website" },
@@ -61,7 +61,7 @@ function AdminPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [editing, setEditing] = useState<string | null>(null);
-  const [tab, setTab] = useState<"shipments" | "people" | "settings" | "support">("shipments");
+  const [tab, setTab] = useState<"shipments" | "flights" | "people" | "settings" | "support">("shipments");
 
   const rows = useMemo(
     () =>
@@ -108,10 +108,10 @@ function AdminPage() {
     <Shell>
       <div className="font-mono text-[11px] tracking-[0.2em] text-primary">CONTROL TOWER</div>
       <h1 className="mt-1 font-display text-3xl font-black tracking-tight">
-        {tab === "shipments" ? "All shipments" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
+        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
       </h1>
       <div className="mt-4 flex w-fit flex-wrap rounded-md bg-card p-1 ring-1 ring-line">
-        {(["shipments", "people", "settings", "support"] as const).map((t) => (
+        {(["shipments", "flights", "people", "settings", "support"] as const).map((t) => (
           <Button
             variant="ghost"
             key={t}
@@ -122,7 +122,7 @@ function AdminPage() {
           </Button>
         ))}
       </div>
-      {tab === "people" ? <People /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
+      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Total" value={String(all.length)} />
@@ -209,6 +209,256 @@ function AdminPage() {
       </div>
       </>}
     </Shell>
+  );
+}
+
+type AdminFlightSegment = {
+  airline?: string;
+  flightNumber?: string;
+  origin?: { code?: string; city?: string; airport?: string; terminal?: string | null };
+  destination?: { code?: string; city?: string; airport?: string; terminal?: string | null };
+  departingAt?: string;
+  arrivingAt?: string;
+  duration?: string | null;
+  aircraft?: string | null;
+};
+
+type AdminFlightPassenger = {
+  givenName?: string;
+  familyName?: string;
+  email?: string;
+  phoneNumber?: string;
+  seats?: { designator?: string; segmentId?: string }[];
+};
+
+type AdminFlightBooking = {
+  id: string;
+  user_id: string;
+  duffel_order_id: string;
+  booking_reference: string | null;
+  booking_references: { booking_reference?: string }[] | null;
+  status: "held" | "expired" | "ticketed" | "cancelled" | "needs_review";
+  itinerary: { segments?: AdminFlightSegment[] }[] | null;
+  passengers: AdminFlightPassenger[] | null;
+  total_amount: number | string;
+  total_currency: string;
+  payment_required_by: string | null;
+  price_guarantee_expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+const FLIGHT_STATUS_LABEL: Record<AdminFlightBooking["status"], string> = {
+  held: "Held · unpaid",
+  expired: "Expired",
+  ticketed: "Ticketed",
+  cancelled: "Cancelled",
+  needs_review: "Needs review",
+};
+
+function flightPrice(amount: number | string, currency: string) {
+  const numericAmount = Number(amount);
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(numericAmount);
+  } catch {
+    return `${currency} ${Number.isFinite(numericAmount) ? numericAmount.toFixed(2) : amount}`;
+  }
+}
+
+function flightRoute(slices: AdminFlightBooking["itinerary"]) {
+  return (slices ?? []).map((slice) => {
+    const segments = slice.segments ?? [];
+    const first = segments[0];
+    const last = segments.at(-1);
+    if (!first || !last) return "Route pending";
+    return `${first.origin?.code || first.origin?.city || "—"} → ${last.destination?.code || last.destination?.city || "—"}`;
+  }).join(" · ");
+}
+
+function FlightReservations() {
+  const list = useServerFn(adminListFlightBookings);
+  const qc = useQueryClient();
+  const { data, isPending, error } = useQuery({
+    queryKey: ["admin-flight-bookings"],
+    queryFn: () => list(),
+    refetchInterval: 60000,
+  });
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<AdminFlightBooking["status"] | "all">("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const bookings = (data ?? []) as AdminFlightBooking[];
+  const rows = bookings.filter((booking) => {
+    if (filter !== "all" && booking.status !== filter) return false;
+    const passengers = booking.passengers ?? [];
+    const passengerText = passengers.map((p) => `${p.givenName ?? ""} ${p.familyName ?? ""} ${p.email ?? ""}`).join(" ");
+    const haystack = [
+      booking.booking_reference ?? "",
+      ...(booking.booking_references ?? []).map((r) => r.booking_reference ?? ""),
+      booking.duffel_order_id,
+      booking.user_id,
+      flightRoute(booking.itinerary),
+      passengerText,
+    ].join(" ").toLowerCase();
+    return haystack.includes(q.trim().toLowerCase());
+  });
+  const heldCount = bookings.filter((booking) => booking.status === "held").length;
+  const reviewCount = bookings.filter((booking) => booking.status === "needs_review").length;
+  const expiredCount = bookings.filter((booking) => booking.status === "expired").length;
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+        <Stat label="Reservations" value={String(bookings.length)} />
+        <Stat label="Active holds" value={String(heldCount)} />
+        <Stat label="Needs review" value={String(reviewCount)} />
+        <Stat label="Expired holds" value={String(expiredCount)} />
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search reference, passenger, route, or airline order…"
+          className="min-w-[240px] flex-1 rounded-md bg-card px-4 py-2.5 font-mono text-sm ring-1 ring-line outline-none focus:ring-primary"
+        />
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as AdminFlightBooking["status"] | "all")}
+          className="rounded-md bg-card px-3 py-2.5 font-mono text-sm ring-1 ring-line"
+          aria-label="Filter flight reservations by status"
+        >
+          <option value="all">All statuses</option>
+          {Object.entries(FLIGHT_STATUS_LABEL).map(([status, label]) => (
+            <option key={status} value={status}>{label}</option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => qc.invalidateQueries({ queryKey: ["admin-flight-bookings"] })}
+          className="rounded-md bg-card px-4 py-2.5 font-mono text-xs ring-1 ring-line hover:text-primary"
+        >Refresh</button>
+      </div>
+
+      <div className="mt-4 divide-y divide-line overflow-hidden rounded-xl bg-card ring-1 ring-line">
+        {isPending && <div className="px-5 py-8 font-mono text-sm text-muted-foreground">Loading flight reservations…</div>}
+        {error && <div className="px-5 py-8 font-mono text-sm text-destructive">{(error as Error).message}</div>}
+        {!isPending && !error && rows.length === 0 && (
+          <div className="px-5 py-8 font-mono text-sm text-muted-foreground">
+            {bookings.length ? "No flight reservations match." : "No flight reservations have been placed yet."}
+          </div>
+        )}
+        {rows.map((booking) => {
+          const passengers = booking.passengers ?? [];
+          const primaryReference = booking.booking_reference
+            || booking.booking_references?.map((item) => item.booking_reference).find(Boolean)
+            || "Reference pending";
+          const names = passengers.map((p) => `${p.givenName ?? ""} ${p.familyName ?? ""}`.trim()).filter(Boolean).join(", ");
+          const expandedRow = expanded === booking.id;
+          const statusClass = booking.status === "ticketed"
+            ? "bg-primary/15 text-primary"
+            : booking.status === "needs_review"
+              ? "bg-destructive/10 text-destructive"
+              : booking.status === "held"
+                ? "bg-caution/15 text-caution"
+                : "bg-muted text-muted-foreground";
+
+          return (
+            <article key={booking.id}>
+              <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div className="min-w-[220px] flex-1">
+                  <div className="label-mono">Airline reservation</div>
+                  <div className="mt-1 font-mono text-sm font-bold">{primaryReference}</div>
+                  <div className="mt-1 font-display text-sm font-semibold">{flightRoute(booking.itinerary)}</div>
+                  <div className="mt-1 truncate font-mono text-xs text-muted-foreground">
+                    {names || `Customer ${booking.user_id}`} · Placed {new Date(booking.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <span className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase ${statusClass}`}>
+                  {FLIGHT_STATUS_LABEL[booking.status] ?? booking.status}
+                </span>
+                <div className="min-w-28 text-right">
+                  <div className="label-mono">Amount due</div>
+                  <div className="mt-1 font-mono text-sm">{flightPrice(booking.total_amount, booking.total_currency)}</div>
+                </div>
+                <button
+                  type="button"
+                  aria-expanded={expandedRow}
+                  onClick={() => setExpanded(expandedRow ? null : booking.id)}
+                  className="rounded-md bg-foreground px-4 py-2 font-display text-xs font-bold text-background hover:bg-primary"
+                >{expandedRow ? "Hide details" : "Details"}</button>
+              </div>
+
+              {expandedRow && (
+                <div className="grid gap-5 border-t border-line bg-background px-5 py-5 lg:grid-cols-2">
+                  <section>
+                    <div className="label-mono mb-3">Itinerary</div>
+                    {(booking.itinerary ?? []).map((slice, sliceIndex) => (
+                      <div key={`${booking.id}-slice-${sliceIndex}`} className="mb-3 rounded-lg bg-card p-4 ring-1 ring-line">
+                        <div className="label-mono mb-3">Journey {sliceIndex + 1}</div>
+                        {(slice.segments ?? []).map((segment, segmentIndex) => (
+                          <div key={`${booking.id}-segment-${sliceIndex}-${segmentIndex}`} className="border-t border-line py-3 first:border-0 first:pt-0 last:pb-0">
+                            <div className="font-display text-sm font-bold">
+                              {segment.airline ?? "Airline"} {segment.flightNumber ?? ""}
+                            </div>
+                            <div className="mt-1 text-sm">
+                              {segment.origin?.code ?? "—"} {segment.origin?.city ? `· ${segment.origin.city}` : ""}
+                              {" → "}
+                              {segment.destination?.code ?? "—"} {segment.destination?.city ? `· ${segment.destination.city}` : ""}
+                            </div>
+                            <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+                              {segment.departingAt ? new Date(segment.departingAt).toLocaleString() : "Departure pending"}
+                              {" → "}
+                              {segment.arrivingAt ? new Date(segment.arrivingAt).toLocaleString() : "Arrival pending"}
+                            </div>
+                            {(segment.aircraft || segment.duration) && (
+                              <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+                                {[segment.aircraft, segment.duration].filter(Boolean).join(" · ")}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                    <div className="rounded-lg bg-card p-4 font-mono text-[11px] ring-1 ring-line">
+                      <div>Airline reference: {primaryReference}</div>
+                      <div className="mt-1 break-all">Airline order ID: {booking.duffel_order_id}</div>
+                      <div className="mt-1">Reservation created: {new Date(booking.created_at).toLocaleString()}</div>
+                      <div className="mt-1">Payment deadline: {booking.payment_required_by ? new Date(booking.payment_required_by).toLocaleString() : "Not provided"}</div>
+                    </div>
+                  </section>
+                  <section>
+                    <div className="label-mono mb-3">Passengers</div>
+                    {passengers.length ? passengers.map((passenger, index) => (
+                      <div key={`${booking.id}-passenger-${index}`} className="mb-2 rounded-lg bg-card p-4 ring-1 ring-line">
+                        <div className="font-display text-sm font-bold">
+                          {[passenger.givenName, passenger.familyName].filter(Boolean).join(" ") || `Passenger ${index + 1}`}
+                        </div>
+                        {passenger.email && <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{passenger.email}</div>}
+                        {passenger.phoneNumber && <div className="mt-1 font-mono text-xs text-muted-foreground">{passenger.phoneNumber}</div>}
+                        {!!passenger.seats?.length && (
+                          <div className="mt-2 font-mono text-xs">Seats: {passenger.seats.map((seat) => seat.designator).filter(Boolean).join(", ")}</div>
+                        )}
+                      </div>
+                    )) : <p className="text-sm text-muted-foreground">Passenger details are not available.</p>}
+                    <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line">
+                      <div className="label-mono">Reservation status</div>
+                      <div className="mt-1 font-display text-sm font-bold">{FLIGHT_STATUS_LABEL[booking.status] ?? booking.status}</div>
+                      <div className="mt-1 font-mono text-xs text-muted-foreground">
+                        {flightPrice(booking.total_amount, booking.total_currency)} · updated {new Date(booking.updated_at).toLocaleString()}
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
