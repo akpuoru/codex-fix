@@ -53,6 +53,7 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          <a href="/flights" className="transition-colors hover:text-foreground">FLIGHTS</a>
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
@@ -104,6 +105,7 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          <a href="/flights" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold">FLIGHTS</a>
         </nav>
       )}
       <div className="h-1 bg-accent" />

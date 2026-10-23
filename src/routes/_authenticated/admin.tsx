@@ -10,7 +10,7 @@ import { useSession } from "@/hooks/use-session";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusDot, StatusPill } from "@/components/shipment-bits";
-import { adminListPeople, adminListShipments, adminSetRole, adminUpdateShipment, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
+import { adminListPeople, adminListShipments, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
 import { CURRENCIES, formatCents, getPricing, STATUS_LABEL, type PricingConfig } from "@/lib/rates";
 import { adminSaveSettings, adminSaveTransferDetails, getTransferDetails, type TransferDetails } from "@/lib/settings.functions";
 import { adminForceLogout, adminListAccounts, adminSetAccountStatus } from "@/lib/accounts.functions";
@@ -39,6 +39,13 @@ const STATUSES = [
   "exception",
 ] as const;
 type Status = (typeof STATUSES)[number];
+type ShipmentEvent = {
+  id: string;
+  status: Status;
+  location: string | null;
+  note: string | null;
+  occurred_at: string;
+};
 
 function AdminPage() {
   const { user } = useSession();
@@ -191,6 +198,7 @@ function AdminPage() {
                 id={s.id}
                 status={s.status as Status}
                 location={s.current_location ?? ""}
+                events={s.events as ShipmentEvent[]}
                 onDone={() => setEditing(null)}
               />
             )}
@@ -420,7 +428,7 @@ function Settings() {
   );
 }
 
-function UpdateForm(props: { id: string; status: Status; location: string; onDone: () => void }) {
+function UpdateForm(props: { id: string; status: Status; location: string; events: ShipmentEvent[]; onDone: () => void }) {
   const update = useServerFn(adminUpdateShipment);
   const qc = useQueryClient();
   const [status, setStatus] = useState<Status>(props.status);
@@ -436,41 +444,147 @@ function UpdateForm(props: { id: string; status: Status; location: string; onDon
     onError: (e) => toast.error((e as Error).message),
   });
   return (
+    <div className="space-y-4 bg-background px-5 py-4">
+      <section>
+        <div className="label-mono mb-2">Add a tracking update</div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (location.trim().length < 2) { toast.error("Enter a location"); return; }
+            m.mutate();
+          }}
+          className="grid gap-3 md:grid-cols-[180px_1fr_1fr_auto]"
+        >
+          <select
+            aria-label="New shipment status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value as Status)}
+            className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>{STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+          <input
+            aria-label="New shipment location"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="New location, e.g. Dubai Hub, UAE"
+            className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
+          />
+          <input
+            aria-label="Tracking scan note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Scan note (optional)"
+            maxLength={300}
+            className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
+          />
+          <button
+            disabled={m.isPending}
+            className="rounded-md bg-primary px-5 py-2 font-display text-sm font-black text-primary-foreground disabled:opacity-60"
+          >
+            {m.isPending ? "Saving…" : "Add scan"}
+          </button>
+        </form>
+      </section>
+
+      <section className="border-t border-line pt-4">
+        <div className="label-mono mb-2">Existing tracking updates</div>
+        {props.events.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No tracking updates have been recorded.</p>
+        ) : (
+          <div className="space-y-2">
+            {props.events.map((event) => <ShipmentEventEditor key={event.id} event={event} />)}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function toLocalDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
+}
+
+function ShipmentEventEditor({ event }: { event: ShipmentEvent }) {
+  const update = useServerFn(adminUpdateShipmentEvent);
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [status, setStatus] = useState<Status>(event.status);
+  const [location, setLocation] = useState(event.location ?? "");
+  const [note, setNote] = useState(event.note ?? "");
+  const [occurredAt, setOccurredAt] = useState(toLocalDateTime(event.occurred_at));
+  const mutation = useMutation({
+    mutationFn: () => update({ data: {
+      eventId: event.id,
+      status,
+      location,
+      note,
+      occurredAt: new Date(occurredAt).toISOString(),
+    } }),
+    onSuccess: () => {
+      toast.success("Tracking update changed");
+      qc.invalidateQueries({ queryKey: ["admin-shipments"] });
+      setEditing(false);
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-card px-3 py-2 ring-1 ring-line">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold">{STATUS_LABEL[event.status]}{event.location ? ` · ${event.location}` : ""}</div>
+          {event.note && <div className="mt-1 break-words text-xs text-muted-foreground">{event.note}</div>}
+          <div className="mt-1 font-mono text-[10px] text-muted-foreground">{new Date(event.occurred_at).toLocaleString()}</div>
+        </div>
+        <button
+          type="button"
+          aria-label={`Edit ${STATUS_LABEL[event.status]} tracking update`}
+          onClick={() => {
+            setStatus(event.status);
+            setLocation(event.location ?? "");
+            setNote(event.note ?? "");
+            setOccurredAt(toLocalDateTime(event.occurred_at));
+            setEditing(true);
+          }}
+          className="rounded-md px-3 py-1.5 font-mono text-xs text-primary ring-1 ring-line hover:bg-background"
+        >Edit update</button>
+      </div>
+    );
+  }
+
+  return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (location.trim().length < 2) { toast.error("Enter a location"); return; }
-        m.mutate();
-      }}
-      className="grid gap-3 bg-background px-5 py-4 md:grid-cols-[180px_1fr_1fr_auto]"
+      onSubmit={(e) => { e.preventDefault(); mutation.mutate(); }}
+      className="grid gap-3 rounded-md bg-card p-3 ring-1 ring-primary/40 md:grid-cols-2"
     >
-      <select
-        value={status}
-        onChange={(e) => setStatus(e.target.value as Status)}
-        className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
-      >
-        {STATUSES.map((s) => (
-          <option key={s} value={s}>{STATUS_LABEL[s]}</option>
-        ))}
-      </select>
-      <input
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        placeholder="New location, e.g. Dubai Hub, UAE"
-        className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
-      />
-      <input
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Scan note (optional)"
-        className="rounded-md bg-card px-3 py-2 font-mono text-sm ring-1 ring-line"
-      />
-      <button
-        disabled={m.isPending}
-        className="rounded-md bg-primary px-5 py-2 font-display text-sm font-black text-primary-foreground disabled:opacity-60"
-      >
-        {m.isPending ? "Saving…" : "Save scan"}
-      </button>
+      <label className="space-y-1 text-xs">
+        <span className="label-mono">Status</span>
+        <select value={status} onChange={(e) => setStatus(e.target.value as Status)} className="w-full rounded-md bg-background px-3 py-2 font-mono text-sm ring-1 ring-line">
+          {STATUSES.map((value) => <option key={value} value={value}>{STATUS_LABEL[value]}</option>)}
+        </select>
+      </label>
+      <label className="space-y-1 text-xs">
+        <span className="label-mono">Date and time</span>
+        <input type="datetime-local" required value={occurredAt} onChange={(e) => setOccurredAt(e.target.value)} className="w-full rounded-md bg-background px-3 py-2 font-mono text-sm ring-1 ring-line" />
+      </label>
+      <label className="space-y-1 text-xs">
+        <span className="label-mono">Location</span>
+        <input value={location} maxLength={160} onChange={(e) => setLocation(e.target.value)} className="w-full rounded-md bg-background px-3 py-2 font-mono text-sm ring-1 ring-line" />
+      </label>
+      <label className="space-y-1 text-xs">
+        <span className="label-mono">Tracking note</span>
+        <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} className="w-full rounded-md bg-background px-3 py-2 font-mono text-sm ring-1 ring-line" />
+      </label>
+      <div className="flex gap-2 md:col-span-2">
+        <button type="submit" disabled={mutation.isPending} className="rounded-md bg-primary px-4 py-2 font-display text-sm font-bold text-primary-foreground disabled:opacity-60">{mutation.isPending ? "Saving…" : "Save changes"}</button>
+        <button type="button" onClick={() => setEditing(false)} className="rounded-md px-4 py-2 font-mono text-xs ring-1 ring-line">Cancel</button>
+      </div>
     </form>
   );
 }

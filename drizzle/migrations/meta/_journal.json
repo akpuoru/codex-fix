@@ -64,6 +64,20 @@
       "when": 1792234747719,
       "tag": "0008_tracking_lookups_and_customs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792709297000,
+      "tag": "0009_admin_edit_shipment_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792753609886,
+      "tag": "0010_flight_holds",
+      "breakpoints": true
     }
   ]
 }

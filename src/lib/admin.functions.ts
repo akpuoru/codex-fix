@@ -29,15 +29,15 @@ export const adminListShipments = createServerFn({ method: "GET" })
     await assertAdmin(context);
     const { data, error } = await context.supabase
       .from("shipments")
-      .select("*, shipment_events(location, occurred_at)")
+      .select("*, shipment_events(id, status, location, note, occurred_at)")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return (data ?? []).map((s) => {
       const events = [...(s.shipment_events ?? [])].sort((a, b) =>
-        b.occurred_at.localeCompare(a.occurred_at),
+        a.occurred_at.localeCompare(b.occurred_at),
       );
       const { shipment_events: _e, ...rest } = s;
-      return { ...rest, current_location: events[0]?.location ?? null };
+      return { ...rest, current_location: events.at(-1)?.location ?? null, events };
     });
   });
 
@@ -77,6 +77,57 @@ export const adminUpdateShipment = createServerFn({ method: "POST" })
       note: data.note || null,
     });
     if (evErr) throw new Error(evErr.message);
+    return { ok: true };
+  });
+
+export const adminUpdateShipmentEvent = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({
+      eventId: z.string().uuid(),
+      status: z.enum(statuses),
+      location: z.string().trim().max(160),
+      note: z.string().trim().max(300),
+      occurredAt: z.string().datetime(),
+    }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { data: event, error: eventError } = await context.supabase
+      .from("shipment_events")
+      .select("id, shipment_id")
+      .eq("id", data.eventId)
+      .maybeSingle();
+    if (eventError) throw new Error(eventError.message);
+    if (!event) throw new Error("Tracking update not found.");
+
+    const { error } = await context.supabase
+      .from("shipment_events")
+      .update({
+        status: data.status,
+        location: data.location || null,
+        note: data.note || null,
+        occurred_at: data.occurredAt,
+      })
+      .eq("id", event.id);
+    if (error) throw new Error(error.message);
+
+    // Keep the shipment summary aligned with whichever scan is now latest.
+    const { data: latest, error: latestError } = await context.supabase
+      .from("shipment_events")
+      .select("status")
+      .eq("shipment_id", event.shipment_id)
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestError) throw new Error(latestError.message);
+    if (latest) {
+      const { error: shipmentError } = await context.supabase
+        .from("shipments")
+        .update({ status: latest.status, progress: STATUS_PROGRESS[latest.status] ?? 50 })
+        .eq("id", event.shipment_id);
+      if (shipmentError) throw new Error(shipmentError.message);
+    }
     return { ok: true };
   });
 

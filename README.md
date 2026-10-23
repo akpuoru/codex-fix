@@ -24,3 +24,16 @@ cd <repository-name>
 npm i
 npm run dev
 ```
+
+## Flight reservations
+
+The Flights area searches for airline offers that support an unpaid hold, creates the hold through Duffel, and stores the carrier booking reference and itinerary for the signed-in customer. It does not charge the customer at reservation time. The hold still expires at the airline's payment deadline; expired reservations are shown as expired and their PNR must not be presented as an active booking.
+
+Before enabling live reservations:
+
+1. Apply `drizzle/migrations/0010_flight_holds.sql` once to the connected Supabase database.
+2. Add `DUFFEL_ACCESS_TOKEN` as a **server-side secret** in Cloudflare Workers & Pages for the production environment. Never prefix it with `VITE_` or put it in `wrangler.jsonc` as a plain variable.
+3. Make sure `SUPABASE_SERVICE_ROLE_KEY` is also configured as a server-side secret; it is used only by the server to save airline-created holds.
+4. Use a Duffel live token only after the Duffel account is ready for live bookings. A test token does not create live airline reservations.
+
+Seat maps and unpaid holds are airline-dependent. The app only offers search results that Duffel reports can be held without immediate payment; available seats and any seat charges are shown when the airline supplies them.
