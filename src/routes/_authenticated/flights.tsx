@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { toast } from "sonner";
-import { Armchair, ArrowLeftRight, CircleAlert, Clock3, Plane, Search, Ticket } from "lucide-react";
+import { Armchair, ArrowLeftRight, Check, CircleAlert, Clock3, LoaderCircle, MapPin, Plane, Search, Ticket } from "lucide-react";
 
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { createFlightHold, getFlightSeatMaps, listMyFlightBookings, searchFlightOffers } from "@/lib/flights.functions";
+import { createFlightHold, getFlightSeatMaps, listMyFlightBookings, searchFlightOffers, searchFlightPlaces } from "@/lib/flights.functions";
 
 export const Route = createFileRoute("/_authenticated/flights")({
   head: () => ({
@@ -59,6 +59,7 @@ function FlightsPage() {
   const [selectedOffer, setSelectedOffer] = useState<any>(null);
   const [seatMaps, setSeatMaps] = useState<any[]>([]);
   const [seatSelections, setSeatSelections] = useState<Record<string, string>>({});
+  const [activeSeatPassenger, setActiveSeatPassenger] = useState(0);
   const [passengers, setPassengers] = useState<Passenger[]>([emptyPassenger()]);
 
   const search = useMutation({
@@ -69,6 +70,7 @@ function FlightsPage() {
       setSelectedOffer(null);
       setSeatMaps([]);
       setSeatSelections({});
+      setActiveSeatPassenger(0);
       setPassengers(Array.from({ length: adults }, emptyPassenger));
       if (!result.offers.length) toast.message("No unpaid hold fares were found. Try different dates or airports.");
     },
@@ -103,6 +105,10 @@ function FlightsPage() {
 
   function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!origin || !destination) {
+      toast.error("Choose both airports from the suggestions before searching.");
+      return;
+    }
     search.mutate();
   }
 
@@ -142,13 +148,9 @@ function FlightsPage() {
             ))}
             <span className="ml-auto flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider text-muted-foreground"><Ticket className="size-4" /> Adult passengers only</span>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <Field label="From · airport code">
-              <input className={inputClass} name="origin" autoComplete="off" maxLength={3} value={origin} onChange={(e) => setOrigin(e.target.value.toUpperCase())} placeholder="LOS" required />
-            </Field>
-            <Field label="To · airport code">
-              <input className={inputClass} name="destination" autoComplete="off" maxLength={3} value={destination} onChange={(e) => setDestination(e.target.value.toUpperCase())} placeholder="LHR" required />
-            </Field>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+            <AirportPicker id="flight-origin" label="From" selectedCode={origin} onSelect={setOrigin} />
+            <AirportPicker id="flight-destination" label="To" selectedCode={destination} onSelect={setDestination} />
             <Field label="Departure">
               <input className={inputClass} type="date" name="departure" min={new Date().toISOString().slice(0, 10)} value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} required />
             </Field>
@@ -217,6 +219,14 @@ function FlightsPage() {
 
             <div className="mt-7">
               <div className="flex items-center gap-2"><Armchair className="size-4 text-primary" /><h3 className="font-display text-lg font-bold">Choose seats</h3></div>
+              {passengers.length > 1 && <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Choose which passenger to assign a seat to">
+                {passengers.map((_, passengerIndex) => <button key={passengerIndex} type="button" onClick={() => setActiveSeatPassenger(passengerIndex)} className={`rounded-md px-3 py-2 text-xs font-semibold ring-1 ring-line ${activeSeatPassenger === passengerIndex ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}>Passenger {passengerIndex + 1}{Object.keys(seatSelections).some((key) => key.endsWith(`:${passengerIndex}`)) ? " · selected" : ""}</button>)}
+              </div>}
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded border border-line bg-card" /> Available</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-primary" /> Selected</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded bg-muted" /> Unavailable</span>
+              </div>
               {seatQuery.isPending ? <p className="mt-3 text-sm text-muted-foreground">Loading the airline seat maps…</p> : null}
               {!seatQuery.isPending && segments.length > 0 && seatMaps.length === 0 && <p className="mt-3 rounded-lg bg-background p-3 text-sm text-muted-foreground ring-1 ring-line">This flight does not provide advance seat selection through the reservation service. The airline may assign a seat at check-in.</p>}
               {segments.map((segment: any) => {
@@ -224,16 +234,24 @@ function FlightsPage() {
                 return <div key={segment.id} className="mt-4 rounded-lg bg-background p-4 ring-1 ring-line">
                   <div className="mb-3 font-display text-sm font-bold">{segment.origin?.iata_code} → {segment.destination?.iata_code} <span className="ml-2 font-mono text-[10px] font-normal text-muted-foreground">{segment.marketing_carrier?.name ?? segment.operating_carrier?.name} {segment.marketing_carrier_flight_number ?? ""}</span></div>
                   {!map ? <p className="text-xs text-muted-foreground">Seat selection is not available for this flight segment.</p> : passengers.map((passenger, passengerIndex) => {
-                    const offerPassengerId = selectedOffer.passengers?.[passengerIndex]?.id;
-                    const choices = seatOptionsFor(seatMaps, offerPassengerId).filter((choice) => choice.segmentId === segment.id);
-                    const key = `${segment.id}:${passengerIndex}`;
-                    return <Field key={key} label={`Passenger ${passengerIndex + 1} · seat`}>
-                      <select className={inputClass} value={seatSelections[key] ?? ""} onChange={(e) => setSeatSelections((old) => ({ ...old, [key]: e.target.value }))}>
-                        <option value="">No seat selected</option>
-                        {choices.map((choice) => <option key={choice.serviceId} value={choice.serviceId}>{choice.designator} · {choice.amount === "0.00" || choice.amount === "0" ? "Free" : money(choice.amount, choice.currency)}</option>)}
-                      </select>
-                      {!choices.length && <span className="mt-1 block text-xs text-muted-foreground">No selectable seats returned for this passenger.</span>}
-                    </Field>;
+                    return passengerIndex === activeSeatPassenger ? <AircraftSeatMap
+                      key={`${segment.id}:${passengerIndex}`}
+                      map={map}
+                      passengerIndex={passengerIndex}
+                      passengerName={`${passenger.givenName} ${passenger.familyName}`.trim() || `Passenger ${passengerIndex + 1}`}
+                      passengerId={selectedOffer.passengers?.[passengerIndex]?.id}
+                      selectedServiceId={seatSelections[`${segment.id}:${passengerIndex}`]}
+                      selections={seatSelections}
+                      onSelect={(serviceId) => setSeatSelections((old) => {
+                        const key = `${segment.id}:${passengerIndex}`;
+                        if (old[key] === serviceId) {
+                          const next = { ...old };
+                          delete next[key];
+                          return next;
+                        }
+                        return { ...old, [key]: serviceId };
+                      })}
+                    /> : null;
                   })}
                 </div>;
               })}
@@ -271,6 +289,169 @@ function FlightsPage() {
       <SiteFooter />
     </div>
   );
+}
+
+type FlightPlace = { id: string; code: string; name: string; city: string; countryCode: string; type: "airport" | "city" };
+
+function AirportPicker({ id, label, selectedCode, onSelect }: { id: string; label: string; selectedCode: string; onSelect: (code: string) => void }) {
+  const placesFn = useServerFn(searchFlightPlaces);
+  const [value, setValue] = useState("");
+  const [debouncedValue, setDebouncedValue] = useState("");
+  const [open, setOpen] = useState(false);
+  const [highlighted, setHighlighted] = useState(0);
+  const suggestionsId = `${id}-suggestions`;
+  const places = useQuery({
+    queryKey: ["flight-place-suggestions", debouncedValue],
+    enabled: open && !selectedCode && debouncedValue.trim().length >= 2,
+    queryFn: () => placesFn({ data: { query: debouncedValue.trim() } }),
+    staleTime: 60_000,
+  });
+  const results: FlightPlace[] = places.data ?? [];
+
+  useEffect(() => {
+    if (!open || selectedCode) return;
+    const timer = window.setTimeout(() => setDebouncedValue(value), 250);
+    return () => window.clearTimeout(timer);
+  }, [open, selectedCode, value]);
+
+  useEffect(() => setHighlighted(0), [results.length, debouncedValue]);
+
+  function choose(place: FlightPlace) {
+    onSelect(place.code);
+    setValue(`${place.city} · ${place.code}`);
+    setOpen(false);
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" && results.length) {
+      event.preventDefault();
+      setHighlighted((index) => (index + 1) % results.length);
+    } else if (event.key === "ArrowUp" && results.length) {
+      event.preventDefault();
+      setHighlighted((index) => (index - 1 + results.length) % results.length);
+    } else if (event.key === "Enter" && open && results.length) {
+      event.preventDefault();
+      choose(results[highlighted] ?? results[0]);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  return <div className="relative">
+    <label htmlFor={id} className="block text-xs font-semibold text-muted-foreground">{label}</label>
+    <div className="relative">
+      <MapPin aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <input
+        id={id}
+        name={id}
+        type="text"
+        autoComplete="off"
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={open && !selectedCode}
+        aria-controls={suggestionsId}
+        aria-activedescendant={open && results[highlighted] ? `${suggestionsId}-${highlighted}` : undefined}
+        placeholder="City or airport"
+        className={`${inputClass} pl-9`}
+        value={value}
+        onFocus={() => { if (!selectedCode) setOpen(true); }}
+        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+        onKeyDown={handleKeyDown}
+        onChange={(event) => {
+          setValue(event.target.value);
+          onSelect("");
+          setOpen(true);
+        }}
+        required
+      />
+    </div>
+    {selectedCode && <div className="mt-1 text-[10px] font-mono text-primary">Selected airport code: {selectedCode}</div>}
+    {open && !selectedCode && value.trim().length >= 2 && <div id={suggestionsId} role="listbox" aria-label={`${label} airports`} className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-md bg-popover p-1 text-popover-foreground shadow-xl ring-1 ring-line">
+      {places.isPending && <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground"><LoaderCircle className="size-4 animate-spin" />Searching airports…</div>}
+      {places.isError && <div role="status" className="px-3 py-3 text-xs text-destructive">Airport suggestions could not load. Check your flight search connection and try again.</div>}
+      {!places.isPending && !places.isError && results.length === 0 && <div className="px-3 py-3 text-xs text-muted-foreground">No matching airports. Try a city or airport name.</div>}
+      {results.map((place, index) => <button
+        key={place.id}
+        id={`${suggestionsId}-${index}`}
+        type="button"
+        role="option"
+        aria-selected={index === highlighted}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setHighlighted(index)}
+        onClick={() => choose(place)}
+        className={`flex w-full items-center justify-between gap-3 rounded px-3 py-2.5 text-left ${index === highlighted ? "bg-muted" : "hover:bg-muted/70"}`}
+      >
+        <span className="min-w-0"><span className="block truncate text-sm font-semibold">{place.city} <span className="font-normal text-muted-foreground">— {place.name}</span></span><span className="mt-0.5 block text-[10px] uppercase text-muted-foreground">{place.type}{place.countryCode ? ` · ${place.countryCode}` : ""}</span></span>
+        <span className="shrink-0 font-mono text-sm font-bold text-primary">{place.code}</span>
+      </button>)}
+    </div>}
+    {!selectedCode && (!open || value.trim().length < 2) && <div className="mt-1 text-[10px] text-muted-foreground">Type a city or airport name to see suggestions.</div>}
+  </div>;
+}
+
+function AircraftSeatMap({ map, passengerIndex, passengerName, passengerId, selectedServiceId, selections, onSelect }: {
+  map: any;
+  passengerIndex: number;
+  passengerName: string;
+  passengerId?: string;
+  selectedServiceId?: string;
+  selections: Record<string, string>;
+  onSelect: (serviceId: string) => void;
+}) {
+  const options = seatOptionsFor([map]);
+  const designatorForService = new Map(options.map((option) => [option.serviceId, option.designator]));
+  const occupied = new Set(Object.entries(selections)
+    .filter(([key]) => key.startsWith(`${map.segment_id}:`) && key !== `${map.segment_id}:${passengerIndex}`)
+    .map(([, serviceId]) => designatorForService.get(serviceId))
+    .filter((designator): designator is string => Boolean(designator)));
+  const selectedDesignator = designatorForService.get(selectedServiceId ?? "");
+  const cabins = map.cabins ?? [];
+
+  return <div className="mt-4">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <span className="text-muted-foreground">Select a seat for <strong className="text-foreground">{passengerName}</strong></span>
+      {selectedDesignator && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Check className="size-3.5" />Seat {selectedDesignator}</span>}
+    </div>
+    <div className="mx-auto max-w-3xl overflow-hidden rounded-t-[3rem] rounded-b-2xl border-x border-t border-line bg-card px-3 pb-5 pt-3 sm:px-6">
+      <div className="mb-4 flex items-center justify-center gap-2 border-b border-dashed border-line pb-3 text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground"><Plane className="size-4 -rotate-90 text-primary" />Front of aircraft</div>
+      {cabins.length === 0 || cabins.every((cabin: any) => !(cabin.rows?.length)) ? <div className="py-6 text-center text-sm text-muted-foreground">The airline did not return a seat layout for this segment.</div> : cabins.map((cabin: any, cabinIndex: number) => <section key={cabin.id ?? cabinIndex} className="mb-5 last:mb-0">
+        {cabins.length > 1 && <div className="mb-3 text-center font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{cabin.name ?? cabin.cabin_class ?? `Cabin ${cabinIndex + 1}`}</div>}
+        <div className="space-y-2">
+          {(cabin.rows ?? []).map((row: any, rowIndex: number) => <div key={row.id ?? rowIndex} className="grid grid-cols-[2rem_1fr] items-center gap-2">
+            <span className="text-right font-mono text-[10px] text-muted-foreground">{row.row_number ?? rowIndex + 1}</span>
+            <div className="flex min-w-0 items-center justify-center gap-3 sm:gap-6">
+              {(row.sections ?? []).map((section: any, sectionIndex: number) => <div key={section.id ?? sectionIndex} className="flex items-center gap-1 sm:gap-1.5">
+                {(section.elements ?? []).map((element: any, elementIndex: number) => {
+                  if (element.type !== "seat" || !element.designator) return <span key={element.id ?? elementIndex} aria-hidden="true" className="mx-1 h-7 w-3" />;
+                  const designator = element.designator as string;
+                  const services = (element.available_services ?? []).filter((service: any) => {
+                    const servicePassenger = service.passenger_id ?? service.passenger?.id;
+                    return !servicePassenger || !passengerId || servicePassenger === passengerId;
+                  });
+                  const service = services[0];
+                  const isSelected = service?.id === selectedServiceId || designator === selectedDesignator;
+                  const isOccupied = occupied.has(designator);
+                  const available = Boolean(service) && !isOccupied;
+                  const price = service ? (Number(service.total_amount) === 0 ? "Free" : money(service.total_amount, service.total_currency)) : "Unavailable";
+                  return <button
+                    key={element.id ?? designator}
+                    type="button"
+                    disabled={!available}
+                    aria-label={`${designator}, ${isSelected ? "selected" : available ? price : "unavailable"}`}
+                    aria-pressed={isSelected}
+                    title={`${designator} · ${isOccupied ? "Assigned to another passenger" : price}`}
+                    onClick={() => service && onSelect(service.id)}
+                    className={`flex h-12 w-10 shrink-0 flex-col items-center justify-center rounded-md border text-[9px] transition-colors sm:h-14 sm:w-12 ${isSelected ? "border-primary bg-primary text-primary-foreground shadow-sm" : available ? "border-line bg-background text-foreground hover:border-primary hover:bg-primary/5" : "cursor-not-allowed border-line/60 bg-muted text-muted-foreground/60"}`}
+                  ><Armchair className="mb-0.5 size-4" /><span className="font-mono font-bold leading-none">{designator}</span></button>;
+                })}
+              </div>)}
+            </div>
+          </div>)}
+        </div>
+      </section>)}
+    </div>
+    <p className="mt-2 text-center text-[10px] text-muted-foreground">Seat layout and fees are provided by the airline and can change before check-in.</p>
+  </div>;
 }
 
 function OfferCard({ offer, active, onSelect }: { offer: any; active: boolean; onSelect: () => void }) {

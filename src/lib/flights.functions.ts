@@ -5,6 +5,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 type JsonObject = Record<string, any>;
 
+const placeSearchSchema = z.object({
+  query: z.string().trim().min(2).max(100),
+});
+
 function getDuffelToken(): string {
   // Read inside a request handler. Cloudflare injects runtime secrets per request.
   const token = typeof process !== "undefined" ? process.env.DUFFEL_ACCESS_TOKEN : undefined;
@@ -37,6 +41,24 @@ async function duffelRequest(path: string, init?: RequestInit): Promise<any> {
   }
   return payload?.data;
 }
+
+export const searchFlightPlaces = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => placeSearchSchema.parse(input))
+  .handler(async ({ data }) => {
+    const places = await duffelRequest(`/places/suggestions?query=${encodeURIComponent(data.query)}`);
+    return (places ?? [])
+      .filter((place: JsonObject) => typeof place.iata_code === "string" && place.iata_code.length === 3)
+      .slice(0, 12)
+      .map((place: JsonObject) => ({
+        id: place.id ?? `${place.type}-${place.iata_code}`,
+        code: place.iata_code as string,
+        name: place.name as string,
+        city: (place.city_name ?? place.city?.name ?? place.name) as string,
+        countryCode: (place.iata_country_code ?? "") as string,
+        type: (place.type === "city" ? "city" : "airport") as "city" | "airport",
+      }));
+  });
 
 const searchSchema = z.object({
   origin: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Enter a three-letter airport code."),

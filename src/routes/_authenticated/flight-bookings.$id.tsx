@@ -28,17 +28,20 @@ function FlightItineraryPage() {
   const isExpired = booking?.status === "expired";
   const needsReview = booking?.status === "needs_review";
 
-  return <div className="min-h-screen bg-muted/40 px-4 py-8 print:bg-white print:p-0">
+  return <div className="min-h-screen bg-muted/40 px-4 py-8 print:min-h-0 print:bg-white print:px-0 print:py-0">
     <div className="mx-auto mb-4 flex max-w-5xl items-center justify-between print:hidden">
       <a href="/flights" className="font-mono text-[11px] tracking-[0.15em] text-muted-foreground hover:text-foreground">← BACK TO FLIGHTS</a>
-      {booking && <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-mono text-xs text-primary-foreground"><Download className="size-4" /> SAVE / PRINT PDF</button>}
+      {booking && <div className="text-right">
+        <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-mono text-xs text-primary-foreground"><Download className="size-4" /> SAVE / PRINT PDF</button>
+        <p className="mt-1 text-[10px] text-muted-foreground">For a clean PDF, turn off “Headers and footers” in the print settings.</p>
+      </div>}
     </div>
 
     {query.isPending && <p className="text-center font-mono text-sm text-muted-foreground">Loading airline reservation…</p>}
     {query.error && <p role="alert" className="text-center font-mono text-sm text-destructive">{(query.error as Error).message}</p>}
     {!query.isPending && !query.error && !booking && <div className="mx-auto max-w-xl rounded-xl bg-card p-6 text-center ring-1 ring-line"><h1 className="font-display text-xl font-bold">Reservation not found</h1><p className="mt-2 text-sm text-muted-foreground">This flight reservation may belong to another account or may have been removed.</p></div>}
 
-    {booking && <article className="mx-auto max-w-5xl bg-card p-5 text-foreground shadow-lg ring-1 ring-line print:shadow-none print:ring-0 sm:p-8">
+    {booking && <article className="mx-auto max-w-5xl bg-card p-5 text-foreground shadow-lg ring-1 ring-line print:w-full print:max-w-none print:bg-white print:p-0 print:text-black print:shadow-none print:ring-0 sm:p-8">
       <header className="border-b-2 border-foreground pb-4">
         <div className="flex flex-wrap items-baseline gap-2 font-display text-xl font-bold uppercase sm:text-2xl">
           <span>{formatDate(firstDeparture)}</span><span className="text-primary">›</span><span>{formatDate(lastArrival)}</span>
@@ -67,7 +70,7 @@ function FlightItineraryPage() {
 
       <div className="flex items-center gap-2 border-b border-line pb-2 font-display text-lg font-bold uppercase"><Plane className="size-5 text-primary" /> Flight itinerary</div>
       <div className="divide-y divide-line">
-        {segments.map((segment: any, index: number) => <section key={`${segment.id ?? index}`} className="py-5">
+        {segments.map((segment: any, index: number) => <section key={`${segment.id ?? index}`} className="py-5 print:break-inside-avoid">
           <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <div className="font-display text-base font-bold uppercase">Departure: {formatDay(segment.departingAt)}</div>
             <span className="text-xs text-muted-foreground">Please verify flight times with the airline</span>
@@ -104,7 +107,7 @@ function FlightItineraryPage() {
         </section>)}
       </div>
 
-      <footer className="mt-2 border-t border-line pt-3 text-center text-xs text-muted-foreground">
+      <footer className="mt-2 border-t border-line pt-3 text-center text-xs text-muted-foreground print:break-inside-avoid">
         <p>Verify this reservation with the airline using the airline reservation code above. Flight times, terminals, and seat assignments can change.</p>
         <p className="mt-2 font-display font-bold text-primary">BRIDGEWAY FLIGHTS · bridgewaytrack.live</p>
       </footer>

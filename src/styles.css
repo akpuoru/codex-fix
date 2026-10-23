@@ -177,3 +177,23 @@ body { top: 0 !important; }
 .hero-scrim { background: linear-gradient(90deg, oklch(0.22 0.05 245 / 96%) 0%, oklch(0.22 0.05 245 / 83%) 35%, oklch(0.22 0.05 245 / 20%) 75%); }
 @media (max-width: 640px) { .hero-scrim { background: oklch(0.22 0.05 245 / 78%); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    min-width: 0 !important;
+    margin: 0 !important;
+    background: #fff !important;
+  }
+
+  body {
+    color: #111 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
