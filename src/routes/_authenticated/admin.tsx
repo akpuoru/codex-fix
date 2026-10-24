@@ -10,7 +10,7 @@ import { useSession } from "@/hooks/use-session";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusDot, StatusPill } from "@/components/shipment-bits";
-import { adminListPeople, adminListShipments, adminListFlightBookings, adminListCarBookings, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
+import { adminListPeople, adminListShipments, adminListFlightBookings, adminListCarBookings, adminListStayBookings, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
 import { CURRENCIES, formatCents, getPricing, STATUS_LABEL, type PricingConfig } from "@/lib/rates";
 import { adminSaveSettings, adminSaveTransferDetails, getTransferDetails, type TransferDetails } from "@/lib/settings.functions";
 import { adminForceLogout, adminListAccounts, adminSetAccountStatus } from "@/lib/accounts.functions";
@@ -61,7 +61,7 @@ function AdminPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [editing, setEditing] = useState<string | null>(null);
-  const [tab, setTab] = useState<"shipments" | "flights" | "cars" | "people" | "settings" | "support">("shipments");
+  const [tab, setTab] = useState<"shipments" | "flights" | "stays" | "cars" | "people" | "settings" | "support">("shipments");
 
   const rows = useMemo(
     () =>
@@ -108,21 +108,21 @@ function AdminPage() {
     <Shell>
       <div className="font-mono text-[11px] tracking-[0.2em] text-primary">CONTROL TOWER</div>
       <h1 className="mt-1 font-display text-3xl font-black tracking-tight">
-        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "cars" ? "Car reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
+        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "stays" ? "Hotel reservations" : tab === "cars" ? "Car reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
       </h1>
       <div className="mt-4 flex w-fit flex-wrap rounded-md bg-card p-1 ring-1 ring-line">
-        {(["shipments", "flights", "cars", "people", "settings", "support"] as const).map((t) => (
+        {(["shipments", "flights", "stays", "cars", "people", "settings", "support"] as const).map((t) => (
           <Button
             variant="ghost"
             key={t}
             onClick={() => setTab(t)}
             className={`rounded px-4 py-1.5 font-mono text-xs uppercase tracking-wider ${tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
           >
-            {t}
+            {t === "stays" ? "hotels" : t}
           </Button>
         ))}
       </div>
-      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "cars" ? <CarHireBookings /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
+      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "stays" ? <HotelBookings /> : tab === "cars" ? <CarHireBookings /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Total" value={String(all.length)} />
@@ -589,6 +589,112 @@ function CarHireBookings() {
       </div>
     </>
   );
+}
+
+function stayBookingAddress(accommodation: any) {
+  const address = accommodation?.location?.address ?? {};
+  return [address.line_one, address.city_name, address.region, address.country_code].filter(Boolean).join(" · ") || "Address not returned";
+}
+
+function HotelBookings() {
+  const list = useServerFn(adminListStayBookings);
+  const qc = useQueryClient();
+  const { data, isPending, error } = useQuery({ queryKey: ["admin-stay-bookings"], queryFn: () => list(), refetchInterval: 60000 });
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"all" | "confirmed" | "booking_pending" | "needs_review" | "failed" | "cancelled">("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const bookings: any[] = data ?? [];
+  const rows = bookings.filter((booking) => {
+    if (filter !== "all" && booking.status !== filter) return false;
+    const guests = booking.guest_details?.guests ?? [];
+    const accommodation = booking.accommodation ?? {};
+    return [
+      booking.booking_reference,
+      booking.duffel_booking_id,
+      booking.duffel_quote_id,
+      booking.user_id,
+      booking.guest_details?.email,
+      booking.guest_details?.phoneNumber,
+      ...guests.flatMap((guest: any) => [guest.givenName, guest.familyName]),
+      accommodation.name,
+      stayBookingAddress(accommodation),
+    ].filter(Boolean).join(" ").toLowerCase().includes(q.trim().toLowerCase());
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = bookings.filter((item) => item.status === "confirmed" && item.check_in_date >= today).length;
+  const review = bookings.filter((item) => ["booking_pending", "needs_review"].includes(item.status)).length;
+  const cancelled = bookings.filter((item) => ["cancelled", "failed"].includes(item.status)).length;
+
+  return <>
+    <div className="mt-6 grid gap-4 sm:grid-cols-4">
+      <Stat label="Reservations" value={String(bookings.length)} />
+      <Stat label="Upcoming arrivals" value={String(upcoming)} />
+      <Stat label="Needs review" value={String(review)} />
+      <Stat label="Cancelled / failed" value={String(cancelled)} />
+    </div>
+    <div className="mt-6 flex flex-wrap gap-3">
+      <input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Search reference, guest, email or hotel…" className="min-w-[240px] flex-1 rounded-md bg-card px-4 py-2.5 font-mono text-sm ring-1 ring-line outline-none focus:ring-primary" />
+      <select value={filter} onChange={(event) => setFilter(event.target.value as typeof filter)} aria-label="Filter hotel reservations by status" className="rounded-md bg-card px-3 py-2.5 font-mono text-sm ring-1 ring-line">
+        <option value="all">All statuses</option><option value="confirmed">Confirmed</option><option value="booking_pending">Booking pending</option><option value="needs_review">Needs review</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option>
+      </select>
+      <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["admin-stay-bookings"] })} className="rounded-md bg-card px-4 py-2.5 font-mono text-xs ring-1 ring-line hover:text-primary">Refresh</button>
+    </div>
+    <div className="mt-4 divide-y divide-line overflow-hidden rounded-xl bg-card ring-1 ring-line">
+      {isPending && <div className="px-5 py-8 font-mono text-sm text-muted-foreground">Loading hotel reservations…</div>}
+      {error && <div role="alert" className="px-5 py-8 font-mono text-sm text-destructive">{(error as Error).message}</div>}
+      {!isPending && !error && rows.length === 0 && <div className="px-5 py-8 font-mono text-sm text-muted-foreground">{bookings.length ? "No hotel reservations match." : "No hotel reservations have been placed yet."}</div>}
+      {rows.map((booking) => {
+        const hotel = booking.accommodation ?? {};
+        const guestDetails = booking.guest_details ?? {};
+        const guests = guestDetails.guests ?? [];
+        const bookingInfo = booking.booking_data ?? {};
+        const expandedRow = expanded === booking.id;
+        const statusLabel = booking.status === "confirmed" ? "Confirmed" : booking.status === "booking_pending" ? "Booking pending" : booking.status === "needs_review" ? "Needs review" : booking.status === "failed" ? "Failed" : "Cancelled";
+        const statusClass = booking.status === "confirmed" ? "bg-primary/15 text-primary" : ["needs_review", "booking_pending"].includes(booking.status) ? "bg-caution/15 text-caution" : "bg-muted text-muted-foreground";
+        return <article key={booking.id}>
+          <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+            <div className="min-w-[220px] flex-1">
+              <div className="label-mono">{booking.booking_reference || (booking.status === "needs_review" ? "Supplier outcome needs review" : "Supplier reference pending")}</div>
+              <div className="mt-1 font-display text-sm font-bold">{hotel.name ?? "Hotel reservation"} · {bookingInfo.roomName ?? "Room details pending"}</div>
+              <div className="mt-1 text-sm">{stayBookingAddress(hotel)}</div>
+              <div className="mt-1 font-mono text-xs text-muted-foreground">{guests.map((guest: any) => `${guest.givenName ?? ""} ${guest.familyName ?? ""}`.trim()).filter(Boolean).join(", ") || "Guest name pending"} · {booking.check_in_date} to {booking.check_out_date}</div>
+            </div>
+            <span className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase ${statusClass}`}>{statusLabel}</span>
+            <div className="min-w-28 text-right"><div className="label-mono">Total</div><div className="mt-1 font-mono text-sm">{flightPrice(booking.total_amount, booking.total_currency)}</div></div>
+            <button type="button" aria-expanded={expandedRow} onClick={() => setExpanded(expandedRow ? null : booking.id)} className="rounded-md bg-foreground px-4 py-2 font-display text-xs font-bold text-background hover:bg-primary">{expandedRow ? "Hide details" : "Details"}</button>
+          </div>
+          {expandedRow && <div className="grid gap-5 border-t border-line bg-background px-5 py-5 lg:grid-cols-2">
+            <section>
+              <div className="label-mono mb-3">Hotel reservation</div>
+              <div className="rounded-lg bg-card p-4 font-mono text-xs ring-1 ring-line">
+                <div>Supplier reference: {booking.booking_reference || "Pending"}</div>
+                <div className="mt-1 break-all">Duffel booking ID: {booking.duffel_booking_id || "Pending"}</div>
+                <div className="mt-1 break-all">Duffel quote ID: {booking.duffel_quote_id}</div>
+                <div className="mt-1">Rate: {bookingInfo.rateName ?? "—"} · {bookingInfo.paymentType ?? "—"}</div>
+                <div className="mt-1">Confirmed: {booking.confirmed_at ? new Date(booking.confirmed_at).toLocaleString() : "Pending"}</div>
+                <div className="mt-1">Created: {new Date(booking.created_at).toLocaleString()}</div>
+                {booking.deposit_amount != null && <div className="mt-1">Deposit: {flightPrice(booking.deposit_amount, booking.deposit_currency ?? booking.total_currency)}</div>}
+                {booking.due_at_accommodation_amount != null && <div className="mt-1">Due at accommodation: {flightPrice(booking.due_at_accommodation_amount, booking.due_at_accommodation_currency ?? booking.total_currency)}</div>}
+              </div>
+              <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line"><div className="label-mono">Property and stay</div><div className="mt-2 font-display font-bold">{hotel.name ?? "Accommodation"}</div><div className="mt-1 text-sm text-muted-foreground">{stayBookingAddress(hotel)}</div><div className="mt-3 text-sm font-semibold">{booking.check_in_date} to {booking.check_out_date} · {booking.rooms} {booking.rooms === 1 ? "room" : "rooms"}</div>{hotel.description && <p className="mt-2 text-xs leading-5 text-muted-foreground">{hotel.description}</p>}</div>
+            </section>
+            <section>
+              <div className="label-mono mb-3">Guest and check-in details</div>
+              <div className="rounded-lg bg-card p-4 ring-1 ring-line">
+                {guests.map((guest: any, index: number) => <div key={index} className="mb-2 font-display text-sm font-bold">{guest.givenName} {guest.familyName}{index === 0 ? " · Lead guest" : ""}</div>)}
+                {guestDetails.email && <div className="mt-2 break-all font-mono text-xs text-muted-foreground">{guestDetails.email}</div>}
+                {guestDetails.phoneNumber && <div className="mt-1 font-mono text-xs text-muted-foreground">{guestDetails.phoneNumber}</div>}
+                {bookingInfo.checkInInformation && <div className="mt-4 text-xs leading-5 text-muted-foreground">Check-in after {bookingInfo.checkInInformation.check_in_after_time ?? "hotel policy"}; check-out before {bookingInfo.checkInInformation.check_out_before_time ?? "hotel policy"}.</div>}
+                {bookingInfo.keyCollection?.instructions && <div className="mt-3 rounded-md bg-background p-3 text-xs leading-5">{bookingInfo.keyCollection.instructions}</div>}
+                {bookingInfo.specialRequests && <div className="mt-3 text-xs leading-5"><strong>Guest request:</strong> {bookingInfo.specialRequests}</div>}
+              </div>
+              {!!bookingInfo.conditions?.length && <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line"><div className="label-mono">Rate conditions</div>{bookingInfo.conditions.map((item: any, index: number) => <p key={index} className="mt-2 text-xs leading-5"><strong>{item.title}: </strong>{item.description}</p>)}</div>}
+            </section>
+          </div>}
+        </article>;
+      })}
+    </div>
+  </>;
 }
 
 function People() {

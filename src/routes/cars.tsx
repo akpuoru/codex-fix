@@ -108,8 +108,8 @@ function CarsLandingPage() {
         </section>
 
         <section className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-5 px-6 py-10">
-          <div><div className="label-mono">Bringing luggage?</div><h2 className="mt-1 font-display text-2xl font-bold">Send your bags ahead with Bridgeway delivery</h2></div>
-          <a href="/book" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary"><PackageCheck className="size-4" />Explore delivery <ArrowRight className="size-4" /></a>
+          <div><div className="label-mono">Planning the rest of your trip?</div><h2 className="mt-1 font-display text-2xl font-bold">Book your stay or send luggage ahead</h2></div>
+          <div className="flex flex-wrap gap-3"><a href="/stays" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary"><ArrowRight className="size-4" />Explore hotels</a><a href="/book" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary"><PackageCheck className="size-4" />Explore delivery</a></div>
         </section>
       </main>
       <SiteFooter />

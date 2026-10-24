@@ -79,6 +79,19 @@ export const adminListCarBookings = createServerFn({ method: "GET" })
     return data ?? [];
   });
 
+export const adminListStayBookings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("stay_bookings")
+      .select("id, user_id, duffel_quote_id, duffel_booking_id, booking_reference, status, check_in_date, check_out_date, rooms, accommodation, guest_details, total_amount, total_currency, deposit_amount, deposit_currency, due_at_accommodation_amount, due_at_accommodation_currency, confirmed_at, booking_data, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(`Unable to load hotel reservations: ${error.message}`);
+    return data ?? [];
+  });
+
 const statuses = [
   "booked",
   "picked_up",

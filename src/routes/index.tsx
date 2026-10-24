@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, CalendarCheck, CarFront, Globe2, PackageCheck, Plane, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarCheck, CarFront, Globe2, Hotel, PackageCheck, Plane, Search, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useSession } from "@/hooks/use-session";
@@ -24,16 +24,16 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Bridgeway · Flights, car hire and delivery" },
+      { title: "Bridgeway · Flights, hotels, car hire and delivery" },
       {
         name: "description",
         content:
-          "Explore airline reservations, compare car hire, book shipments and track parcels, luggage and freight across international routes.",
+          "Explore airline reservations, hotel stays, car hire, shipments and parcel tracking across international routes.",
       },
-      { property: "og:title", content: "Bridgeway · Flights, car hire and global delivery" },
+      { property: "og:title", content: "Bridgeway · Flights, hotels, car hire and global delivery" },
       {
         property: "og:description",
-        content: "Explore flights, reserve a rental car and arrange international courier, luggage and freight delivery.",
+        content: "Explore flights, hotel stays and car hire, then arrange international courier, luggage and freight delivery.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://bridgewaytrack.live/" },
@@ -93,8 +93,8 @@ function Home() {
         </section>
 
         <section aria-label="Choose a Bridgeway service" className="mx-auto max-w-[1440px] px-6 py-12">
-          <div className="mb-6"><div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">One Bridgeway. Three ways to move.</div><h2 className="mt-2 font-display text-3xl font-bold">Where would you like to go?</h2></div>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="mb-6"><div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">One Bridgeway. Four ways to plan your journey.</div><h2 className="mt-2 font-display text-3xl font-bold">Where would you like to go?</h2></div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <article className="flex flex-col rounded-xl bg-secondary p-6 text-secondary-foreground sm:p-8">
               <div className="grid size-11 place-items-center rounded-md bg-accent/15 text-accent"><Plane className="size-5" /></div>
               <div className="mt-5 label-mono text-secondary-foreground/65">Bridgeway flights</div>
@@ -115,6 +115,13 @@ function Home() {
               <h3 className="mt-1 font-display text-2xl font-bold">Choose a car for your trip</h3>
               <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">Compare rental cars and reserve eligible postpaid options to pay at the supplier counter.</p>
               <a href="/cars" className="mt-6 inline-flex items-center gap-2 self-start rounded-md bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-primary">Explore car hire <ArrowRight className="size-4" /></a>
+            </article>
+            <article className="flex flex-col rounded-xl bg-card p-6 ring-1 ring-line sm:p-8">
+              <div className="grid size-11 place-items-center rounded-md bg-primary/10 text-primary"><Hotel className="size-5" /></div>
+              <div className="mt-5 label-mono">Bridgeway stays</div>
+              <h3 className="mt-1 font-display text-2xl font-bold">Find a hotel for your trip</h3>
+              <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">Compare available properties, rooms, cancellation terms and final rates before confirming.</p>
+              <a href="/stays" className="mt-6 inline-flex items-center gap-2 self-start rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Explore hotels <ArrowRight className="size-4" /></a>
             </article>
           </div>
         </section>

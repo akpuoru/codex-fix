@@ -52,12 +52,15 @@ function Dashboard() {
             </div>
             <h1 className="mt-1 font-display text-3xl font-bold">Your shipments</h1>
           </div>
-          <Link
-            to="/book"
-            className="rounded-lg bg-primary px-6 py-3 font-display text-sm font-black text-primary-foreground transition-[filter] hover:brightness-110"
-          >
-            New shipment →
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/stays/book" className="rounded-lg bg-card px-5 py-3 font-display text-sm font-bold ring-1 ring-line transition-colors hover:border-primary hover:text-primary">Book a hotel →</Link>
+            <Link
+              to="/book"
+              className="rounded-lg bg-primary px-6 py-3 font-display text-sm font-black text-primary-foreground transition-[filter] hover:brightness-110"
+            >
+              New shipment →
+            </Link>
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-3">
