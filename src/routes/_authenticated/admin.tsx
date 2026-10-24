@@ -10,7 +10,7 @@ import { useSession } from "@/hooks/use-session";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { StatusDot, StatusPill } from "@/components/shipment-bits";
-import { adminListPeople, adminListShipments, adminListFlightBookings, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
+import { adminListPeople, adminListShipments, adminListFlightBookings, adminListCarBookings, adminSetRole, adminUpdateShipment, adminUpdateShipmentEvent, adminConfirmShipment, adminMarkPaid, checkIsAdmin, adminSetCustoms, adminTrackingLookups } from "@/lib/admin.functions";
 import { CURRENCIES, formatCents, getPricing, STATUS_LABEL, type PricingConfig } from "@/lib/rates";
 import { adminSaveSettings, adminSaveTransferDetails, getTransferDetails, type TransferDetails } from "@/lib/settings.functions";
 import { adminForceLogout, adminListAccounts, adminSetAccountStatus } from "@/lib/accounts.functions";
@@ -61,7 +61,7 @@ function AdminPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [editing, setEditing] = useState<string | null>(null);
-  const [tab, setTab] = useState<"shipments" | "flights" | "people" | "settings" | "support">("shipments");
+  const [tab, setTab] = useState<"shipments" | "flights" | "cars" | "people" | "settings" | "support">("shipments");
 
   const rows = useMemo(
     () =>
@@ -108,10 +108,10 @@ function AdminPage() {
     <Shell>
       <div className="font-mono text-[11px] tracking-[0.2em] text-primary">CONTROL TOWER</div>
       <h1 className="mt-1 font-display text-3xl font-black tracking-tight">
-        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
+        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "cars" ? "Car reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
       </h1>
       <div className="mt-4 flex w-fit flex-wrap rounded-md bg-card p-1 ring-1 ring-line">
-        {(["shipments", "flights", "people", "settings", "support"] as const).map((t) => (
+        {(["shipments", "flights", "cars", "people", "settings", "support"] as const).map((t) => (
           <Button
             variant="ghost"
             key={t}
@@ -122,7 +122,7 @@ function AdminPage() {
           </Button>
         ))}
       </div>
-      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
+      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "cars" ? <CarHireBookings /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Total" value={String(all.length)} />
@@ -454,6 +454,135 @@ function FlightReservations() {
                   </section>
                 </div>
               )}
+            </article>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function carBookingLocation(location: any) {
+  const address = location?.address;
+  return [location?.name, address?.city_name, address?.region, address?.country_code].filter(Boolean).join(" · ") || location?.city_name || "Location pending";
+}
+
+function CarHireBookings() {
+  const list = useServerFn(adminListCarBookings);
+  const qc = useQueryClient();
+  const { data, isPending, error } = useQuery({
+    queryKey: ["admin-car-bookings"],
+    queryFn: () => list(),
+    refetchInterval: 60000,
+  });
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"all" | "confirmed" | "cancelled" | "needs_review">("all");
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const bookings: any[] = data ?? [];
+  const rows = bookings.filter((booking) => {
+    if (filter !== "all" && booking.status !== filter) return false;
+    const driver = booking.booking_data?.driver ?? booking.driver ?? {};
+    const vehicle = booking.booking_data?.car ?? booking.car ?? {};
+    const supplier = booking.booking_data?.supplier ?? booking.supplier ?? {};
+    const pickup = booking.booking_data?.pickupLocation ?? booking.pickup_location ?? {};
+    const dropoff = booking.booking_data?.dropoffLocation ?? booking.dropoff_location ?? {};
+    return [
+      booking.booking_reference,
+      booking.duffel_booking_id,
+      booking.user_id,
+      driver.givenName,
+      driver.familyName,
+      driver.email,
+      driver.phoneNumber,
+      vehicle.name,
+      supplier.name,
+      carBookingLocation(pickup),
+      carBookingLocation(dropoff),
+    ].filter(Boolean).join(" ").toLowerCase().includes(q.trim().toLowerCase());
+  });
+  const upcoming = bookings.filter((booking) => booking.status === "confirmed" && new Date(`${booking.pickup_date}T${booking.pickup_time || "00:00"}:00`).getTime() >= Date.now()).length;
+  const review = bookings.filter((booking) => booking.status === "needs_review").length;
+  const cancelled = bookings.filter((booking) => booking.status === "cancelled").length;
+
+  return (
+    <>
+      <div className="mt-6 grid gap-4 sm:grid-cols-4">
+        <Stat label="Reservations" value={String(bookings.length)} />
+        <Stat label="Upcoming pick-ups" value={String(upcoming)} />
+        <Stat label="Needs review" value={String(review)} />
+        <Stat label="Cancelled" value={String(cancelled)} />
+      </div>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search reference, driver, vehicle or airport…" className="min-w-[240px] flex-1 rounded-md bg-card px-4 py-2.5 font-mono text-sm ring-1 ring-line outline-none focus:ring-primary" />
+        <select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Filter car reservations by status" className="rounded-md bg-card px-3 py-2.5 font-mono text-sm ring-1 ring-line">
+          <option value="all">All statuses</option><option value="confirmed">Confirmed</option><option value="needs_review">Needs review</option><option value="cancelled">Cancelled</option>
+        </select>
+        <button type="button" onClick={() => qc.invalidateQueries({ queryKey: ["admin-car-bookings"] })} className="rounded-md bg-card px-4 py-2.5 font-mono text-xs ring-1 ring-line hover:text-primary">Refresh</button>
+      </div>
+      <div className="mt-4 divide-y divide-line overflow-hidden rounded-xl bg-card ring-1 ring-line">
+        {isPending && <div className="px-5 py-8 font-mono text-sm text-muted-foreground">Loading car reservations…</div>}
+        {error && <div className="px-5 py-8 font-mono text-sm text-destructive">{(error as Error).message}</div>}
+        {!isPending && !error && rows.length === 0 && <div className="px-5 py-8 font-mono text-sm text-muted-foreground">{bookings.length ? "No car reservations match." : "No car reservations have been placed yet."}</div>}
+        {rows.map((booking) => {
+          const details = booking.booking_data ?? {};
+          const driver = details.driver ?? booking.driver ?? {};
+          const vehicle = details.car ?? booking.car ?? {};
+          const supplier = details.supplier ?? booking.supplier ?? {};
+          const pickup = details.pickupLocation ?? booking.pickup_location ?? {};
+          const dropoff = details.dropoffLocation ?? booking.dropoff_location ?? {};
+          const expandedRow = expanded === booking.id;
+          const statusLabel = booking.status === "confirmed" ? "Confirmed · postpaid" : booking.status === "cancelled" ? "Cancelled" : "Needs review";
+          const statusClass = booking.status === "confirmed" ? "bg-primary/15 text-primary" : booking.status === "needs_review" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground";
+          const instructions = pickup.additional_information ?? [];
+
+          return (
+            <article key={booking.id}>
+              <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+                <div className="min-w-[220px] flex-1">
+                  <div className="label-mono">{booking.booking_reference || "Supplier reference pending"}</div>
+                  <div className="mt-1 font-display text-sm font-bold">{vehicle.name ?? "Rental vehicle"} · {supplier.name ?? "Rental supplier"}</div>
+                  <div className="mt-1 text-sm">{carBookingLocation(pickup)} → {carBookingLocation(dropoff)}</div>
+                  <div className="mt-1 font-mono text-xs text-muted-foreground">{driver.givenName ?? "Driver"} {driver.familyName ?? ""} · Pick-up {booking.pickup_date} {booking.pickup_time}</div>
+                </div>
+                <span className={`rounded-md px-2 py-1 font-mono text-[10px] uppercase ${statusClass}`}>{statusLabel}</span>
+                <div className="min-w-28 text-right"><div className="label-mono">Total</div><div className="mt-1 font-mono text-sm">{flightPrice(booking.total_amount, booking.total_currency)}</div></div>
+                <button type="button" aria-expanded={expandedRow} onClick={() => setExpanded(expandedRow ? null : booking.id)} className="rounded-md bg-foreground px-4 py-2 font-display text-xs font-bold text-background hover:bg-primary">{expandedRow ? "Hide details" : "Details"}</button>
+              </div>
+              {expandedRow && <div className="grid gap-5 border-t border-line bg-background px-5 py-5 lg:grid-cols-2">
+                <section>
+                  <div className="label-mono mb-3">Reservation</div>
+                  <div className="rounded-lg bg-card p-4 font-mono text-xs ring-1 ring-line">
+                    <div>Supplier reference: {booking.booking_reference || "Pending"}</div>
+                    <div className="mt-1 break-all">Duffel booking ID: {booking.duffel_booking_id}</div>
+                    <div className="mt-1">Supplier: {supplier.name ?? "—"}</div>
+                    <div className="mt-1">Payment: {booking.payment_type} · collected at pickup</div>
+                    <div className="mt-1">Confirmed: {booking.confirmed_at ? new Date(booking.confirmed_at).toLocaleString() : "Pending"}</div>
+                    <div className="mt-1">Booked: {new Date(booking.created_at).toLocaleString()}</div>
+                  </div>
+                  <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line">
+                    <div className="label-mono">Vehicle details</div>
+                    <div className="mt-2 font-display font-bold">{vehicle.name ?? "Rental vehicle"}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">{[vehicle.category, vehicle.transmission, vehicle.fuel].filter(Boolean).join(" · ")}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Capacity {vehicle.max_passengers ?? "—"} · Mileage {details.mileage?.type ?? booking.mileage?.type ?? "As supplier terms"}</div>
+                  </div>
+                </section>
+                <section>
+                  <div className="label-mono mb-3">Driver & collection</div>
+                  <div className="rounded-lg bg-card p-4 ring-1 ring-line">
+                    <div className="font-display text-sm font-bold">{driver.givenName ?? ""} {driver.familyName ?? ""}</div>
+                    {driver.email && <div className="mt-1 break-all font-mono text-xs text-muted-foreground">{driver.email}</div>}
+                    {driver.phoneNumber && <div className="mt-1 font-mono text-xs text-muted-foreground">{driver.phoneNumber}</div>}
+                    <div className="mt-4 text-sm font-semibold">Pick-up · {booking.pickup_date} {booking.pickup_time}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{carBookingLocation(pickup)}</div>
+                    {pickup.phone_number && <div className="mt-1 font-mono text-xs text-muted-foreground">{pickup.phone_number}</div>}
+                    <div className="mt-4 text-sm font-semibold">Drop-off · {booking.dropoff_date} {booking.dropoff_time}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{carBookingLocation(dropoff)}</div>
+                    {dropoff.phone_number && <div className="mt-1 font-mono text-xs text-muted-foreground">{dropoff.phone_number}</div>}
+                  </div>
+                  {!!instructions.length && <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line"><div className="label-mono">Supplier pick-up instructions</div>{instructions.map((item: any, index: number) => <p key={index} className="mt-2 text-xs leading-5"><strong>{item.title}: </strong>{item.text}</p>)}</div>}
+                  {!!(details.conditions ?? booking.conditions)?.length && <div className="mt-3 rounded-lg bg-card p-4 ring-1 ring-line"><div className="label-mono">Rental conditions</div>{(details.conditions ?? booking.conditions).map((item: any, index: number) => <p key={index} className="mt-2 text-xs leading-5"><strong>{item.title}: </strong>{item.text}</p>)}</div>}
+                </section>
+              </div>}
             </article>
           );
         })}

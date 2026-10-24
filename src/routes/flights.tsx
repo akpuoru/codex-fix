@@ -131,8 +131,8 @@ function FlightsLandingPage() {
         </section>
 
         <section className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-5 px-6 py-10">
-          <div><div className="label-mono">Need to move something too?</div><h2 className="mt-1 font-display text-2xl font-bold">Explore Bridgeway delivery</h2></div>
-          <a href="/#delivery" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary">Courier, luggage and freight <ArrowRight className="size-4" /></a>
+          <div><div className="label-mono">Completing your trip?</div><h2 className="mt-1 font-display text-2xl font-bold">Book a car or send luggage ahead</h2></div>
+          <div className="flex flex-wrap gap-3"><a href="/cars" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary">Car hire <ArrowRight className="size-4" /></a><a href="/#delivery" className="inline-flex items-center gap-2 rounded-md border border-line bg-card px-5 py-3 text-sm font-semibold hover:border-primary">Courier, luggage and freight <ArrowRight className="size-4" /></a></div>
         </section>
       </main>
       <SiteFooter />

@@ -66,6 +66,19 @@ export const adminListFlightBookings = createServerFn({ method: "GET" })
     }));
   });
 
+export const adminListCarBookings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("car_bookings")
+      .select("id, user_id, duffel_booking_id, booking_reference, status, payment_type, pickup_date, pickup_time, dropoff_date, dropoff_time, pickup_location, dropoff_location, car, supplier, driver, conditions, charges, privacy_policies, mileage, total_amount, total_currency, confirmed_at, booking_data, created_at, updated_at")
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(`Unable to load car reservations: ${error.message}`);
+    return data ?? [];
+  });
+
 const statuses = [
   "booked",
   "picked_up",

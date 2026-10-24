@@ -78,6 +78,13 @@
       "when": 1792753609886,
       "tag": "0010_flight_holds",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1792800000000,
+      "tag": "0011_car_rentals",
+      "breakpoints": true
     }
   ]
 }

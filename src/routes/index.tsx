@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, CalendarCheck, Globe2, PackageCheck, Plane, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarCheck, CarFront, Globe2, PackageCheck, Plane, Search, ShieldCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useSession } from "@/hooks/use-session";
@@ -24,16 +24,16 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Bridgeway · Flights and international delivery" },
+      { title: "Bridgeway · Flights, car hire and delivery" },
       {
         name: "description",
         content:
-          "Explore airline reservation holds, get delivery rates, book shipments and track parcels, luggage and freight across 140 international corridors.",
+          "Explore airline reservations, compare car hire, book shipments and track parcels, luggage and freight across international routes.",
       },
-      { property: "og:title", content: "Bridgeway · Flights and global delivery" },
+      { property: "og:title", content: "Bridgeway · Flights, car hire and global delivery" },
       {
         property: "og:description",
-        content: "Explore flights, book eligible airline holds and arrange international courier, luggage and freight delivery.",
+        content: "Explore flights, reserve a rental car and arrange international courier, luggage and freight delivery.",
       },
       { property: "og:type", content: "website" },
       { property: "og:url", content: "https://bridgewaytrack.live/" },
@@ -80,7 +80,7 @@ function Home() {
             <div className="flex min-w-0 flex-1 items-center gap-2 px-2"><Search className="size-5 shrink-0 text-primary" /><input value={tracking} onChange={(event) => setTracking(event.target.value)} placeholder="Enter your tracking number" aria-label="Tracking number" required minLength={3} maxLength={40} className="min-w-0 flex-1 bg-transparent py-2 text-sm outline-none" /></div>
             <Button type="submit" className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90">Track delivery <ArrowRight className="size-4" /></Button>
           </form>
-          <div className="mt-5 flex flex-wrap gap-6 text-sm font-semibold"><Link to="/book" className="inline-flex items-center gap-2 hover:text-accent">Book a shipment <ArrowRight className="size-4" /></Link><a href="/flights" className="inline-flex items-center gap-2 hover:text-accent">Explore flights <ArrowRight className="size-4" /></a><Link to="/contact" className="text-secondary-foreground/80 hover:text-accent">Speak to our team</Link></div>
+          <div className="mt-5 flex flex-wrap gap-6 text-sm font-semibold"><Link to="/book" className="inline-flex items-center gap-2 hover:text-accent">Book a shipment <ArrowRight className="size-4" /></Link><a href="/flights" className="inline-flex items-center gap-2 hover:text-accent">Explore flights <ArrowRight className="size-4" /></a><a href="/cars" className="inline-flex items-center gap-2 hover:text-accent">Hire a car <ArrowRight className="size-4" /></a><Link to="/contact" className="text-secondary-foreground/80 hover:text-accent">Speak to our team</Link></div>
         </ServiceHero>
 
         <section className="border-b border-line bg-card">
@@ -93,8 +93,8 @@ function Home() {
         </section>
 
         <section aria-label="Choose a Bridgeway service" className="mx-auto max-w-[1440px] px-6 py-12">
-          <div className="mb-6"><div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">One Bridgeway. Two ways to move.</div><h2 className="mt-2 font-display text-3xl font-bold">Where would you like to go?</h2></div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="mb-6"><div className="text-xs font-bold uppercase tracking-[0.14em] text-primary">One Bridgeway. Three ways to move.</div><h2 className="mt-2 font-display text-3xl font-bold">Where would you like to go?</h2></div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             <article className="flex flex-col rounded-xl bg-secondary p-6 text-secondary-foreground sm:p-8">
               <div className="grid size-11 place-items-center rounded-md bg-accent/15 text-accent"><Plane className="size-5" /></div>
               <div className="mt-5 label-mono text-secondary-foreground/65">Bridgeway flights</div>
@@ -108,6 +108,13 @@ function Home() {
               <h3 className="mt-1 font-display text-2xl font-bold">Send parcels and freight</h3>
               <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">Get an estimate, book a shipment and follow its progress across the delivery network.</p>
               <Link to="/book" className="mt-6 inline-flex items-center gap-2 self-start rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90">Book delivery <ArrowRight className="size-4" /></Link>
+            </article>
+            <article className="flex flex-col rounded-xl bg-card p-6 ring-1 ring-line sm:p-8">
+              <div className="grid size-11 place-items-center rounded-md bg-primary/10 text-primary"><CarFront className="size-5" /></div>
+              <div className="mt-5 label-mono">Bridgeway car hire</div>
+              <h3 className="mt-1 font-display text-2xl font-bold">Choose a car for your trip</h3>
+              <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">Compare rental cars and reserve eligible postpaid options to pay at the supplier counter.</p>
+              <a href="/cars" className="mt-6 inline-flex items-center gap-2 self-start rounded-md bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-primary">Explore car hire <ArrowRight className="size-4" /></a>
             </article>
           </div>
         </section>

@@ -44,6 +44,7 @@ export function SiteHeader() {
 
         <nav className="ml-4 hidden items-center gap-5 text-xs font-semibold text-muted-foreground lg:flex">
           <a href="/flights" className="transition-colors hover:text-foreground">FLIGHTS</a>
+          <a href="/cars" className="transition-colors hover:text-foreground">CAR HIRE</a>
           {NAV.map((item) => (
             <Link
               key={item.to}
@@ -101,6 +102,7 @@ export function SiteHeader() {
       {menuOpen && (
         <nav className="grid border-t border-line bg-card px-4 py-3 lg:hidden">
           <a href="/flights" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold">FLIGHTS</a>
+          <a href="/cars" onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold">CAR HIRE</a>
           {NAV.map((item) => (
             <Link key={item.to} to={item.to} onClick={() => setMenuOpen(false)} className="border-b border-line py-3 text-sm font-semibold last:border-0">
               {item.label}
