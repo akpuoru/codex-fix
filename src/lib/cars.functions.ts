@@ -97,7 +97,7 @@ const carSearchSchema = z.object({
   pickupTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
   dropoffDate: z.string().date(),
   dropoffTime: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/),
-  driverDateOfBirth: z.string().date(),
+  driverAge: z.number().int().min(18).max(99),
   residenceCountryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
 });
 
@@ -116,8 +116,6 @@ export const searchCarRates = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => carSearchSchema.parse(input))
   .handler(async ({ data }) => {
-    const age = ageOnDate(data.driverDateOfBirth, data.pickupDate);
-    if (age < 18 || age > 99) throw new Error("The main driver must be 18–99 years old on the pickup date.");
     if (data.pickupDate < new Date().toISOString().slice(0, 10)) throw new Error("Choose a future pickup date.");
     if (data.dropoffDate < data.pickupDate || (data.dropoffDate === data.pickupDate && data.dropoffTime <= data.pickupTime)) {
       throw new Error("Drop-off must be after pick-up.");
@@ -139,14 +137,21 @@ export const searchCarRates = createServerFn({ method: "POST" })
             radius: 5,
             geographic_coordinates: { latitude: data.dropoff.latitude, longitude: data.dropoff.longitude },
           },
-          driver: { age, residence_country_code: data.residenceCountryCode },
+          driver: { age: data.driverAge, residence_country_code: data.residenceCountryCode },
         },
       }),
     });
 
-    const rates = (result?.rates ?? []).filter((rate: JsonObject) => rate.payment_type === "postpaid");
+    const allRates = result?.rates ?? [];
+    const rates = allRates.filter((rate: JsonObject) => rate.payment_type === "postpaid");
     return {
       searchId: result?.id as string | undefined,
+      paymentTypeCounts: {
+        total: allRates.length,
+        postpaid: allRates.filter((rate: JsonObject) => rate.payment_type === "postpaid").length,
+        guarantee: allRates.filter((rate: JsonObject) => rate.payment_type === "guarantee").length,
+        prepaid: allRates.filter((rate: JsonObject) => rate.payment_type === "prepaid").length,
+      },
       search: {
         pickup: data.pickup,
         dropoff: data.dropoff,
@@ -154,7 +159,7 @@ export const searchCarRates = createServerFn({ method: "POST" })
         pickupTime: data.pickupTime,
         dropoffDate: data.dropoffDate,
         dropoffTime: data.dropoffTime,
-        driverAge: age,
+        driverAge: data.driverAge,
         residenceCountryCode: data.residenceCountryCode,
       },
       rates: rates.slice(0, 40),
@@ -183,6 +188,7 @@ function disclosureKey(disclosure: JsonObject) {
 
 const carBookingSchema = z.object({
   rateId: z.string().min(8).max(100),
+  expectedDriverAge: z.number().int().min(18).max(99),
   quotedAmount: z.string().regex(/^\d+(?:\.\d{1,4})?$/),
   quotedCurrency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
   acceptedPolicyKeys: z.array(z.string().max(10000)).max(20).default([]),
@@ -229,6 +235,9 @@ export const createCarBooking = createServerFn({ method: "POST" })
 
     const age = ageOnDate(data.driver.dateOfBirth, quote.pickup_date);
     if (age < 18 || age > 99) throw new Error("The main driver must be 18–99 years old on the pickup date.");
+    if (age !== data.expectedDriverAge) {
+      throw new Error("The driver’s date of birth does not match the age used for this search. Search again with the correct age.");
+    }
 
     // Check database readiness before placing a live reservation with the supplier.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

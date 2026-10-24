@@ -56,7 +56,7 @@ function CarHirePage() {
   const [pickupTime, setPickupTime] = useState("10:00");
   const [dropoffDate, setDropoffDate] = useState("");
   const [dropoffTime, setDropoffTime] = useState("10:00");
-  const [driverDateOfBirth, setDriverDateOfBirth] = useState("");
+  const [driverAge, setDriverAge] = useState("");
   const [residenceCountryCode, setResidenceCountryCode] = useState("");
   const [driver, setDriver] = useState<CarDriver>({ givenName: "", familyName: "", dateOfBirth: "", email: user?.email ?? "", phoneNumber: "" });
   const [inboundFlightNumber, setInboundFlightNumber] = useState("");
@@ -92,7 +92,7 @@ function CarHirePage() {
         pickupTime,
         dropoffDate,
         dropoffTime,
-        driverDateOfBirth,
+        driverAge: Number(driverAge),
         residenceCountryCode,
       } });
     },
@@ -103,8 +103,11 @@ function CarHirePage() {
       setAcceptedConditions(false);
       setAcceptRentalTerms(false);
       setBookingConfirmation(null);
-      setDriver((current) => ({ ...current, dateOfBirth: driverDateOfBirth }));
-      if (!result.rates.length) toast.message("No pay-at-counter cars were found. Try another airport or pickup time.");
+      if (!result.rates.length && result.paymentTypeCounts.total === 0) {
+        toast.message("No rental rates were returned. Try another airport, date or pickup time.");
+      } else if (!result.rates.length) {
+        toast.message("Rental options were returned, but none can be reserved without a card guarantee or online prepayment.");
+      }
     },
     onError: (error) => toast.error((error as Error).message || "Car search failed."),
   });
@@ -114,19 +117,20 @@ function CarHirePage() {
       const currentQuote = quote.data as any;
       if (!selectedRateId || !currentQuote?.id) throw new Error("Select a car and load its final quote first.");
       if (!acceptRentalTerms) throw new Error("Confirm that you accept the postpaid rental terms before booking.");
-      if (!driver.givenName.trim() || !driver.familyName.trim() || !driver.email.trim() || !driver.phoneNumber.trim()) {
-        throw new Error("Complete the main driver’s name, email and phone number.");
+      if (!driver.givenName.trim() || !driver.familyName.trim() || !driver.email.trim() || !driver.phoneNumber.trim() || !driver.dateOfBirth) {
+        throw new Error("Complete the main driver’s name, date of birth, email and phone number.");
       }
       const policies = currentQuote.privacy_policies ?? [];
       const conditions = currentQuote.conditions ?? [];
       return bookFn({ data: {
         rateId: selectedRateId,
+        expectedDriverAge: search.data?.search.driverAge ?? Number(driverAge),
         quotedAmount: String(currentQuote.total_amount),
         quotedCurrency: String(currentQuote.total_currency),
         acceptedPolicyKeys: policies.filter((item: any) => acceptedPolicies.includes(disclosureKey(item))).map(disclosureKey),
         acceptedConditionKeys: acceptedConditions ? conditions.map(disclosureKey) : [],
         acceptRentalTerms: true,
-        driver: { ...driver, dateOfBirth: driverDateOfBirth },
+        driver,
         inboundFlightNumber,
       } });
     },
@@ -184,11 +188,11 @@ function CarHirePage() {
             <Field label="Pick-up time"><input className={inputClass} type="time" name="pickup-time" value={pickupTime} onChange={(e) => setPickupTime(e.target.value)} required /></Field>
             <Field label="Drop-off date"><input className={inputClass} type="date" name="dropoff-date" min={pickupDate || today} value={dropoffDate} onChange={(e) => setDropoffDate(e.target.value)} required /></Field>
             <Field label="Drop-off time"><input className={inputClass} type="time" name="dropoff-time" value={dropoffTime} onChange={(e) => setDropoffTime(e.target.value)} required /></Field>
-            <Field label="Main driver date of birth"><input className={inputClass} type="date" name="driver-birth-date" max={pickupDate || today} value={driverDateOfBirth} onChange={(e) => setDriverDateOfBirth(e.target.value)} required /></Field>
+            <Field label="Main driver age at pick-up"><input className={inputClass} type="number" name="driver-age" min={18} max={99} step={1} inputMode="numeric" placeholder="e.g. 30" value={driverAge} onChange={(e) => setDriverAge(e.target.value)} required /></Field>
             <Field label="Driver residence · 2-letter country code"><input className={inputClass} name="driver-country" autoComplete="country" placeholder="e.g. NG" maxLength={2} pattern="[A-Za-z]{2}" value={residenceCountryCode} onChange={(e) => setResidenceCountryCode(e.target.value.toUpperCase())} required /></Field>
           </div>
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <p className="flex max-w-2xl items-start gap-2 text-xs leading-5 text-muted-foreground"><CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" />Only pay-at-counter rates appear. Check the supplier’s licence, deposit and card requirements before pickup.</p>
+            <p className="flex max-w-2xl items-start gap-2 text-xs leading-5 text-muted-foreground"><CircleAlert className="mt-0.5 size-4 shrink-0 text-caution" />We show postpaid cars that need no card to reserve. Suppliers may also offer pay-at-counter cars that require a card guarantee.</p>
             <button type="submit" disabled={search.isPending} className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-3 font-display text-sm font-bold text-primary-foreground hover:brightness-110 disabled:opacity-60">
               <Search className="size-4" />{search.isPending ? "Searching…" : "Search cars"}
             </button>
@@ -200,9 +204,14 @@ function CarHirePage() {
         {search.data && (
           <section className="mt-8">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
-              <div><div className="label-mono">Pay at pickup</div><h2 className="mt-1 font-display text-xl font-bold">{rates.length ? `${rates.length} cars available` : "No pay-at-counter cars found"}</h2></div>
+              <div><div className="label-mono">Pay at pickup</div><h2 className="mt-1 font-display text-xl font-bold">{rates.length ? `${rates.length} no-card cars available` : "No no-card cars found"}</h2></div>
               <div className="font-mono text-xs text-muted-foreground">{search.data.search.pickup.code} <ArrowLeftRight className="mx-1 inline size-3" /> {search.data.search.dropoff.code}</div>
             </div>
+            {!rates.length && <p className="mb-4 max-w-3xl text-sm leading-6 text-muted-foreground">
+              {search.data.paymentTypeCounts.total === 0
+                ? "Duffel returned no available cars for these dates and locations. Try a different airport, date or pickup time."
+                : `Duffel returned ${search.data.paymentTypeCounts.total} car rate(s), but none can be reserved without a card or online payment. ${search.data.paymentTypeCounts.guarantee} require a card guarantee (payment is collected at pickup); ${search.data.paymentTypeCounts.prepaid} require prepayment.`}
+            </p>}
             {rates.length > 0 && <div className="grid gap-3">{rates.map((rate) => (
               <CarRateCard key={rate.id} rate={rate} active={selectedRateId === rate.id} loading={quote.isPending && quote.variables === rate.id} onSelect={() => quote.mutate(rate.id)} />
             ))}</div>}
@@ -267,8 +276,9 @@ function CarHirePage() {
                 <Field label="Last / family name"><input className={textInputClass} name="driver-family-name" autoComplete="family-name" value={driver.familyName} onChange={(e) => updateDriver("familyName", e.target.value)} required /></Field>
                 <Field label="Email"><input className={textInputClass} type="email" name="driver-email" autoComplete="email" value={driver.email} onChange={(e) => updateDriver("email", e.target.value)} required /></Field>
                 <Field label="Phone · include country code"><input className={textInputClass} type="tel" name="driver-phone" autoComplete="tel" placeholder="+2348012345678" pattern="[+][1-9][0-9]{6,14}" title="Enter an international phone number, such as +2348012345678." value={driver.phoneNumber} onChange={(e) => updateDriver("phoneNumber", e.target.value)} required /></Field>
+                <Field label="Date of birth"><input className={textInputClass} type="date" name="driver-date-of-birth" max={quoteData.pickup_date || today} value={driver.dateOfBirth} onChange={(e) => updateDriver("dateOfBirth", e.target.value)} required /></Field>
                 <Field label="Inbound flight number · optional"><input className={textInputClass} name="inbound-flight-number" placeholder="e.g. BA 75" maxLength={30} value={inboundFlightNumber} onChange={(e) => setInboundFlightNumber(e.target.value)} /></Field>
-                <div className="flex items-end text-xs text-muted-foreground">Date of birth {driverDateOfBirth ? new Date(`${driverDateOfBirth}T00:00:00`).toLocaleDateString() : "—"} · residence {residenceCountryCode}</div>
+                <div className="flex items-end text-xs text-muted-foreground">Search age {search.data.search.driverAge} · residence {residenceCountryCode}</div>
               </div>
             </div>
 
