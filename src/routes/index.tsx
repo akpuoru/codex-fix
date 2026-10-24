@@ -8,6 +8,7 @@ import { useMemo, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ServiceHero } from "@/components/service-hero";
+import { SponsoredAdvertisements } from "@/components/sponsored-advertisements";
 import { Button } from "@/components/ui/button";
 import { ProgressBar, StatusPill } from "@/components/shipment-bits";
 import { listMyShipments } from "@/lib/shipments.functions";
@@ -125,6 +126,8 @@ function Home() {
             </article>
           </div>
         </section>
+
+        <SponsoredAdvertisements />
 
         <section className="mx-auto max-w-[1440px] px-6 py-14">
           <div className="grid gap-8 lg:grid-cols-[1fr_0.8fr]">

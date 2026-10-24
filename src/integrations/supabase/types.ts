@@ -426,6 +426,60 @@ export type Database = {
         }
         Relationships: []
       }
+      advert_requests: {
+        Row: {
+          brand_name: string
+          brand_url: string | null
+          budget: string
+          campaign_end: string
+          campaign_start: string
+          contact_name: string
+          created_at: string
+          creative_url: string | null
+          description: string
+          email: string
+          headline: string
+          id: string
+          landing_url: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          brand_name: string
+          brand_url?: string | null
+          budget: string
+          campaign_end: string
+          campaign_start: string
+          contact_name: string
+          created_at?: string
+          creative_url?: string | null
+          description: string
+          email: string
+          headline: string
+          id?: string
+          landing_url: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          brand_name?: string
+          brand_url?: string | null
+          budget?: string
+          campaign_end?: string
+          campaign_start?: string
+          contact_name?: string
+          created_at?: string
+          creative_url?: string | null
+          description?: string
+          email?: string
+          headline?: string
+          id?: string
+          landing_url?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tracking_lookups: {
         Row: {
           browser: string | null
@@ -511,6 +565,17 @@ export type Database = {
         }[]
       }
       get_transfer_details: { Args: never; Returns: Json }
+      get_active_advertisements: {
+        Args: never
+        Returns: {
+          brand_name: string
+          creative_url: string | null
+          description: string
+          headline: string
+          id: string
+          landing_url: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -532,6 +597,22 @@ export type Database = {
           _name: string
           _topic: string
           _tracking: string
+        }
+        Returns: string
+      }
+      submit_advert_request: {
+        Args: {
+          _brand_name: string
+          _brand_url: string
+          _budget: string
+          _campaign_end: string
+          _campaign_start: string
+          _contact_name: string
+          _creative_url: string
+          _description: string
+          _email: string
+          _headline: string
+          _landing_url: string
         }
         Returns: string
       }

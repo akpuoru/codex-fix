@@ -15,6 +15,8 @@ export function SiteFooter() {
         <div className="sm:text-right">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-secondary-foreground/50">Customer care</div>
           <Link to="/contact" className="mt-3 inline-block text-sm font-semibold hover:underline">Contact our team →</Link>
+          <br />
+          <Link to="/advertise" className="mt-2 inline-block text-sm font-semibold hover:underline">Advertise with us →</Link>
           <p className="mt-2 text-xs text-secondary-foreground/65">Flight, hotel, car hire and shipment enquiries</p>
         </div>
       </div>

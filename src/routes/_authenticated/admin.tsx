@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { SupportInbox } from "@/components/support-inbox";
+import { AdvertisingInbox } from "@/components/advertising-inbox";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { SiteHeader } from "@/components/site-header";
@@ -61,7 +62,7 @@ function AdminPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Status | "all">("all");
   const [editing, setEditing] = useState<string | null>(null);
-  const [tab, setTab] = useState<"shipments" | "flights" | "stays" | "cars" | "people" | "settings" | "support">("shipments");
+  const [tab, setTab] = useState<"shipments" | "flights" | "stays" | "cars" | "people" | "settings" | "support" | "advertising">("shipments");
 
   const rows = useMemo(
     () =>
@@ -108,10 +109,10 @@ function AdminPage() {
     <Shell>
       <div className="font-mono text-[11px] tracking-[0.2em] text-primary">CONTROL TOWER</div>
       <h1 className="mt-1 font-display text-3xl font-black tracking-tight">
-        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "stays" ? "Hotel reservations" : tab === "cars" ? "Car reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : "Currency & rates"}
+        {tab === "shipments" ? "All shipments" : tab === "flights" ? "Flight reservations" : tab === "stays" ? "Hotel reservations" : tab === "cars" ? "Car reservations" : tab === "people" ? "People" : tab === "support" ? "Support inbox" : tab === "advertising" ? "Brand advertising" : "Currency & rates"}
       </h1>
       <div className="mt-4 flex w-fit flex-wrap rounded-md bg-card p-1 ring-1 ring-line">
-        {(["shipments", "flights", "stays", "cars", "people", "settings", "support"] as const).map((t) => (
+        {(["shipments", "flights", "stays", "cars", "people", "settings", "support", "advertising"] as const).map((t) => (
           <Button
             variant="ghost"
             key={t}
@@ -122,7 +123,7 @@ function AdminPage() {
           </Button>
         ))}
       </div>
-      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "stays" ? <HotelBookings /> : tab === "cars" ? <CarHireBookings /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : <>
+      {tab === "people" ? <People /> : tab === "flights" ? <FlightReservations /> : tab === "stays" ? <HotelBookings /> : tab === "cars" ? <CarHireBookings /> : tab === "settings" ? <><Settings /><TransferSettings /></> : tab === "support" ? <SupportInbox /> : tab === "advertising" ? <AdvertisingInbox /> : <>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
         <Stat label="Total" value={String(all.length)} />

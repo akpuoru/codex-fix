@@ -92,6 +92,13 @@
       "when": 1792843200000,
       "tag": "0012_stay_bookings",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792929600000,
+      "tag": "0013_advertising",
+      "breakpoints": true
     }
   ]
 }
