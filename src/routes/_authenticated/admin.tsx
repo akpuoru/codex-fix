@@ -1199,12 +1199,17 @@ function CustomsForm({ id, initial }: { id: string; initial: string }) {
 
 function Lookups({ id }: { id: string }) {
   const fetchFn = useServerFn(adminTrackingLookups);
-  const { data, isPending } = useQuery({ queryKey: ["lookups", id], queryFn: () => fetchFn({ data: { id } }) });
+  const { data, isPending, error, refetch } = useQuery({ queryKey: ["lookups", id], queryFn: () => fetchFn({ data: { id } }) });
   const rows = (data ?? []) as Array<{ id: string; created_at: string; device: string | null; browser: string | null; os: string | null; city: string | null; region: string | null; country: string | null; ip: string | null }>;
   return (
     <div className="bg-background px-5 pb-5">
       <div className="label-mono mb-1">Tracking lookups {rows[0] ? `· last tracked ${new Date(rows[0].created_at).toLocaleString("en-GB")}` : ""}</div>
-      {isPending ? <div className="font-mono text-xs text-muted-foreground">Loading…</div> : rows.length === 0 ? (
+      {isPending ? <div className="font-mono text-xs text-muted-foreground">Loading…</div> : error ? (
+        <div role="alert" className="flex flex-wrap items-center gap-3 font-mono text-xs text-destructive">
+          <span>Unable to load tracking lookups: {error.message}</span>
+          <button type="button" onClick={() => void refetch()} className="rounded px-3 py-1.5 text-foreground ring-1 ring-line hover:bg-card">Retry</button>
+        </div>
+      ) : rows.length === 0 ? (
         <div className="font-mono text-xs text-muted-foreground">Nobody has tracked this waybill yet.</div>
       ) : (
         <div className="overflow-x-auto rounded-md ring-1 ring-line">

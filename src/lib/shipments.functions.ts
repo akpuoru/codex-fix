@@ -44,13 +44,23 @@ export const trackShipment = createServerFn({ method: "GET" })
     });
     if (eventsError) throw new Error(eventsError.message);
     const { data: notice } = await supabase.rpc("track_shipment_notice", { _tracking: data.tracking });
-    await logLookup(data.tracking).catch(() => {});
+    await logLookup(data.tracking).catch((error: unknown) => {
+      console.warn(
+        "[tracking] Unable to record shipment lookup:",
+        error instanceof Error ? error.message : "Unknown logging error",
+      );
+    });
     return { shipment, events: events ?? [], notice: (notice as string | null) ?? null };
   });
 
 async function logLookup(tracking: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { data: s } = await supabaseAdmin.from("shipments").select("id").ilike("tracking_number", tracking.trim()).maybeSingle();
+  const { data: s, error: shipmentError } = await supabaseAdmin
+    .from("shipments")
+    .select("id")
+    .ilike("tracking_number", tracking.trim())
+    .maybeSingle();
+  if (shipmentError) throw new Error(`Unable to resolve tracked waybill: ${shipmentError.message}`);
   if (!s) return;
   const ua = (getRequestHeader("user-agent") ?? "").slice(0, 400);
   const ip = (getRequestHeader("cf-connecting-ip") ?? getRequestHeader("x-forwarded-for")?.split(",")[0] ?? "").trim() || null;
@@ -64,7 +74,16 @@ async function logLookup(tracking: string) {
       if (j.success) { city = j.city ?? null; region = j.region ?? null; country = j.country ?? country; }
     } catch { /* optional */ }
   }
-  await supabaseAdmin.from("tracking_lookups").insert({ shipment_id: s.id, ip, user_agent: ua, ...parseUA(ua), city, region, country });
+  const { error: insertError } = await supabaseAdmin.from("tracking_lookups").insert({
+    shipment_id: s.id,
+    ip,
+    user_agent: ua,
+    ...parseUA(ua),
+    city,
+    region,
+    country,
+  });
+  if (insertError) throw new Error(`Unable to save tracking lookup: ${insertError.message}`);
 }
 
 export const listMyShipments = createServerFn({ method: "GET" })
