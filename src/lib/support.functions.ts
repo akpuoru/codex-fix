@@ -45,13 +45,14 @@ export const submitSupport = createServerFn({ method: "POST" })
     return { id };
   });
 
-const conversationSchema = z.object({ reference: z.string().uuid() });
-const replySchema = z.object({ reference: z.string().uuid(), message: z.string().trim().min(1).max(3000) });
+const conversationSchema = z.object({ reference: z.string().trim().regex(/^\d{16}$/, "Enter the 16-digit support reference.") });
+const replySchema = z.object({ reference: z.string().trim().regex(/^\d{16}$/, "Enter the 16-digit support reference."), message: z.string().trim().min(1).max(3000) });
+const adminReplySchema = z.object({ id: z.string().uuid(), message: z.string().trim().min(1).max(3000) });
 
 export const getSupportConversation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => conversationSchema.parse(input))
   .handler(async ({ data }) => {
-    const { data: rows, error } = await createPublicSupportClient().rpc("get_support_conversation", { _request: data.reference });
+    const { data: rows, error } = await createPublicSupportClient().rpc("get_support_conversation", { _reference: data.reference });
     if (error) throw new Error("Unable to load this support conversation. Check the reference and try again.");
     if (!rows?.length) throw new Error("We couldn't find a conversation with that reference.");
     return rows;
@@ -61,7 +62,7 @@ export const replySupportConversation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => replySchema.parse(input))
   .handler(async ({ data }) => {
     const { error } = await createPublicSupportClient().rpc("reply_support_conversation", {
-      _request: data.reference,
+      _reference: data.reference,
       _message: data.message,
     });
     if (error) throw new Error(error.message.includes("Too many replies") ? "Too many replies. Please try again later." : "Your reply could not be sent. Check the reference and try again.");
@@ -87,10 +88,10 @@ export const listSupport = createServerFn({ method: "GET" })
 
 export const adminReplySupportConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => replySchema.parse(input))
+  .inputValidator((input: unknown) => adminReplySchema.parse(input))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("admin_reply_support_conversation", {
-      _request: data.reference,
+      _request: data.id,
       _message: data.message,
     });
     if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to send this reply.");

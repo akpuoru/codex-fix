@@ -430,6 +430,7 @@ export type Database = {
           id: string
           message: string
           name: string
+          public_reference: string
           status: string
           topic: string
           tracking_number: string | null
@@ -441,6 +442,7 @@ export type Database = {
           id?: string
           message: string
           name: string
+          public_reference: string
           status?: string
           topic: string
           tracking_number?: string | null
@@ -452,6 +454,7 @@ export type Database = {
           id?: string
           message?: string
           name?: string
+          public_reference?: string
           status?: string
           topic?: string
           tracking_number?: string | null
@@ -622,13 +625,13 @@ export type Database = {
       }
       start_live_chat: { Args: never; Returns: string }
       get_support_conversation: {
-        Args: { _request: string }
+        Args: { _reference: string }
         Returns: {
           message: string | null
           message_created_at: string | null
           name: string
+          reference: string
           request_created_at: string
-          request_id: string
           sender_type: string | null
           status: string
           topic: string
@@ -636,7 +639,7 @@ export type Database = {
         }[]
       }
       reply_support_conversation: {
-        Args: { _message: string; _request: string }
+        Args: { _message: string; _reference: string }
         Returns: string
       }
       admin_reply_support_conversation: {

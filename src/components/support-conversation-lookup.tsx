@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { getSupportConversation, replySupportConversation } from "@/lib/support.functions";
 
 type ConversationRow = {
-  request_id: string;
+  reference: string;
   name: string;
   topic: string;
   tracking_number: string | null;
@@ -66,15 +66,15 @@ export function SupportConversationLookup() {
 
     <form className="mt-5 flex flex-col gap-3 sm:flex-row" onSubmit={(event) => { event.preventDefault(); void loadConversation(); }}>
       <label className="sr-only" htmlFor="support-reference">Private support reference</label>
-      <input id="support-reference" name="support-reference" value={reference} onChange={(event) => setReference(event.target.value)} required placeholder="Paste the full support reference" autoComplete="off" className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2.5 font-mono text-sm outline-none focus:ring-2 focus:ring-primary" />
+      <input id="support-reference" name="support-reference" value={reference} onChange={(event) => setReference(event.target.value.replace(/\D/g, "").slice(0, 16))} required inputMode="numeric" pattern="[0-9]{16}" maxLength={16} placeholder="Enter the 16-digit reference" autoComplete="off" className="min-w-0 flex-1 rounded-md border border-line bg-background px-3 py-2.5 font-mono text-sm outline-none focus:ring-2 focus:ring-primary" />
       <Button type="submit" disabled={pending}>{pending && !rows ? <LoaderCircle className="animate-spin" /> : null}Open conversation</Button>
     </form>
 
     {error && <p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
 
     {request && <div className="mt-6 border-t border-line pt-5">
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{request.name} · {request.topic}</p><p className="mt-1 text-xs text-muted-foreground">Reference {request.request_id} · {request.status}{request.tracking_number ? ` · ${request.tracking_number}` : ""}</p></div></div>
-      <div className="mt-4 space-y-3">{messages.map((row, index) => <article key={`${row.request_id}-${row.message_created_at}-${index}`} className={`rounded-md p-4 ${row.sender_type === "staff" ? "bg-secondary text-secondary-foreground" : "bg-muted/50"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold">{request.name} · {request.topic}</p><p className="mt-1 text-xs text-muted-foreground">Reference {request.reference} · {request.status}{request.tracking_number ? ` · ${request.tracking_number}` : ""}</p></div></div>
+      <div className="mt-4 space-y-3">{messages.map((row, index) => <article key={`${row.reference}-${row.message_created_at}-${index}`} className={`rounded-md p-4 ${row.sender_type === "staff" ? "bg-secondary text-secondary-foreground" : "bg-muted/50"}`}>
         <div className="flex flex-wrap justify-between gap-2 text-xs font-semibold"><span>{row.sender_type === "staff" ? "Bridgeway support" : "You"}</span><time className="font-normal opacity-70">{new Date(row.message_created_at!).toLocaleString("en-GB")}</time></div>
         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{row.message}</p>
       </article>)}</div>
