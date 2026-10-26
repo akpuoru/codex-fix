@@ -56,10 +56,7 @@ const adminReplySchema = z.object({
   id: z.string().uuid(),
   message: z.string().trim().min(1).max(3000),
   attachments: attachmentSchema,
-});
-const adminEmailSchema = z.object({
-  id: z.string().uuid(),
-  message: z.string().trim().min(1).max(3000),
+  action: z.enum(["site", "email"]).default("site"),
 });
 const supportMessageIdSchema = z.object({ id: z.string().uuid() });
 
@@ -105,6 +102,35 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => adminReplySchema.parse(input))
   .handler(async ({ data, context }) => {
+    if (data.action === "email") {
+      const { data: admin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+      if (roleError || !admin) throw new Error("Admin access required.");
+
+      const { data: request, error: requestError } = await context.supabase
+        .from("support_requests")
+        .select("name, email, public_reference")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (requestError || !request) {
+        console.error("[Support email] Could not load the support request recipient.", requestError?.message);
+        throw new Error("Unable to load this customer's email address.");
+      }
+
+      try {
+        const { sendSupportReplyEmail } = await import("@/lib/support-email.server");
+        const emailResult = await sendSupportReplyEmail({
+          to: request.email,
+          name: request.name,
+          reference: request.public_reference,
+          message: data.message,
+        });
+        return { action: "email" as const, emailSent: emailResult.sent, emailIssue: emailResult.issue };
+      } catch (emailError) {
+        console.error("[Support email] Email-only reply failed.", emailError);
+        return { action: "email" as const, emailSent: false, emailIssue: "provider_error" as const };
+      }
+    }
+
     const { error } = await context.supabase.rpc("admin_reply_support_conversation", {
       _request: data.id,
       _message: data.message,
@@ -112,39 +138,7 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
     });
     if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to send this reply.");
 
-    return { ok: true };
-  });
-
-export const adminEmailSupportCustomer = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => adminEmailSchema.parse(input))
-  .handler(async ({ data, context }) => {
-    const { data: admin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
-    if (roleError || !admin) throw new Error("Admin access required.");
-
-    const { data: request, error: requestError } = await context.supabase
-      .from("support_requests")
-      .select("name, email, public_reference")
-      .eq("id", data.id)
-      .maybeSingle();
-    if (requestError || !request) {
-      console.error("[Support email] Could not load the support request recipient.", requestError?.message);
-      throw new Error("Unable to load this customer's email address.");
-    }
-
-    try {
-      const { sendSupportReplyEmail } = await import("@/lib/support-email.server");
-      const emailResult = await sendSupportReplyEmail({
-        to: request.email,
-        name: request.name,
-        reference: request.public_reference,
-        message: data.message,
-      });
-      return { emailSent: emailResult.sent, emailIssue: emailResult.issue };
-    } catch (emailError) {
-      console.error("[Support email] Email-only reply failed.", emailError);
-      return { emailSent: false, emailIssue: "provider_error" as const };
-    }
+    return { action: "site" as const, ok: true };
   });
 
 export const adminDeleteSupportMessage = createServerFn({ method: "POST" })

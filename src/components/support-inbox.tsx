@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mail, Check, Inbox, Send, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { adminDeleteSupportConversation, adminDeleteSupportMessage, adminEmailSupportCustomer, adminReplySupportConversation, listSupport, resolveSupport } from "@/lib/support.functions";
+import { adminDeleteSupportConversation, adminDeleteSupportMessage, adminReplySupportConversation, listSupport, resolveSupport } from "@/lib/support.functions";
 import { removeSupportPhotos, SupportPhotoGallery, SupportPhotoPicker, uploadSupportPhotos } from "@/components/support-photo-tools";
 import { useSession } from "@/hooks/use-session";
 import { AdminLiveChats } from "@/components/admin-live-chats";
@@ -13,7 +13,6 @@ export function SupportInbox() {
   const list = useServerFn(listSupport);
   const resolve = useServerFn(resolveSupport);
   const reply = useServerFn(adminReplySupportConversation);
-  const emailCustomer = useServerFn(adminEmailSupportCustomer);
   const deleteConversation = useServerFn(adminDeleteSupportConversation);
   const deleteMessage = useServerFn(adminDeleteSupportMessage);
   const { user } = useSession();
@@ -27,7 +26,7 @@ export function SupportInbox() {
   const replyMutation = useMutation({ mutationFn: async (data: { id: string; reference: string; message: string; files: File[] }) => {
     const attachments = await uploadSupportPhotos(data.reference, data.files);
     try {
-      return await reply({ data: { id: data.id, message: data.message, attachments } });
+      return await reply({ data: { id: data.id, message: data.message, attachments, action: "site" } });
     } catch (error) {
       await removeSupportPhotos(attachments);
       throw error;
@@ -38,11 +37,11 @@ export function SupportInbox() {
     void qc.invalidateQueries({ queryKey: ["support-inbox"] });
     toast.success("Reply posted to the support conversation.");
   }, onError: () => toast.error("Unable to post this reply.") });
-  const emailMutation = useMutation({ mutationFn: (data: { id: string; message: string }) => emailCustomer({ data }), onSuccess: (result, data) => {
-    if (result.emailSent) {
+  const emailMutation = useMutation({ mutationFn: (data: { id: string; message: string }) => reply({ data: { ...data, attachments: [], action: "email" } }), onSuccess: (result, data) => {
+    if (result.action === "email" && result.emailSent) {
       setEmailDrafts((current) => ({ ...current, [data.id]: "" }));
       toast.success("Email sent. It was not added to the support conversation.");
-    } else if (result.emailIssue === "not_configured") {
+    } else if (result.action === "email" && result.emailIssue === "not_configured") {
       toast.error("Email is not configured. Add RESEND_API_KEY and SUPPORT_EMAIL_FROM in Cloudflare.");
     } else {
       toast.error("Email could not be sent. It was not added to the support conversation.");
