@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Mail, Check, Inbox, Send, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { adminReplySupportConversation, listSupport, resolveSupport } from "@/lib/support.functions";
+import { adminEmailSupportCustomer, adminReplySupportConversation, listSupport, resolveSupport } from "@/lib/support.functions";
 import { removeSupportPhotos, SupportPhotoGallery, SupportPhotoPicker, uploadSupportPhotos } from "@/components/support-photo-tools";
 import { useSession } from "@/hooks/use-session";
 import { AdminLiveChats } from "@/components/admin-live-chats";
@@ -13,10 +13,12 @@ export function SupportInbox() {
   const list = useServerFn(listSupport);
   const resolve = useServerFn(resolveSupport);
   const reply = useServerFn(adminReplySupportConversation);
+  const emailCustomer = useServerFn(adminEmailSupportCustomer);
   const { user } = useSession();
   const qc = useQueryClient();
   const [filter, setFilter] = useState("new");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [photos, setPhotos] = useState<Record<string, File[]>>({});
   const query = useQuery({ queryKey: ["support-inbox", user?.id], queryFn: () => list(), enabled: !!user, refetchInterval: 30000 });
   const mutation = useMutation({ mutationFn: (data: { id: string; status: "new" | "resolved" }) => resolve({ data }), onSuccess: () => qc.invalidateQueries({ queryKey: ["support-inbox"] }), onError: () => toast.error("Unable to update this request.") });
@@ -28,18 +30,22 @@ export function SupportInbox() {
       await removeSupportPhotos(attachments);
       throw error;
     }
-  }, onSuccess: (result, data) => {
+  }, onSuccess: (_result, data) => {
     setDrafts((current) => ({ ...current, [data.id]: "" }));
     setPhotos((current) => ({ ...current, [data.id]: [] }));
     void qc.invalidateQueries({ queryKey: ["support-inbox"] });
+    toast.success("Reply posted to the support conversation.");
+  }, onError: () => toast.error("Unable to post this reply.") });
+  const emailMutation = useMutation({ mutationFn: (data: { id: string; message: string }) => emailCustomer({ data }), onSuccess: (result, data) => {
     if (result.emailSent) {
-      toast.success("Reply added and customer email queued.");
+      setEmailDrafts((current) => ({ ...current, [data.id]: "" }));
+      toast.success("Email sent. It was not added to the support conversation.");
     } else if (result.emailIssue === "not_configured") {
-      toast.error("Reply saved, but email is not configured. Add RESEND_API_KEY and SUPPORT_EMAIL_FROM in Cloudflare.");
+      toast.error("Email is not configured. Add RESEND_API_KEY and SUPPORT_EMAIL_FROM in Cloudflare.");
     } else {
-      toast.error("Reply saved, but the email could not be sent. Use “Reply by email” to contact the customer.");
+      toast.error("Email could not be sent. It was not added to the support conversation.");
     }
-  }, onError: () => toast.error("Unable to send this reply.") });
+  }, onError: () => toast.error("Unable to email this customer.") });
   const rows = (query.data ?? []).filter((row) => filter === "all" || row.status === filter);
   return <section className="mt-6">
     <AdminLiveChats />
@@ -52,9 +58,14 @@ export function SupportInbox() {
       <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold uppercase text-primary">{row.topic} {row.tracking_number && `· ${row.tracking_number}`}<span className="font-normal normal-case text-muted-foreground">· Case reference {row.public_reference}</span><Button type="button" size="sm" variant="ghost" className="h-7 px-2" aria-label="Copy support reference" onClick={async () => { try { await navigator.clipboard.writeText(row.public_reference); toast.success("Support reference copied."); } catch { toast.error("Could not copy the reference."); } }}><Copy className="size-3" />Copy reference</Button></div>
       <div className="mt-4 space-y-3">{row.messages.map((message) => <article key={message.id} className={`rounded-md p-4 ${message.sender_type === "staff" ? "bg-secondary text-secondary-foreground" : "bg-muted/50"}`}><div className="flex flex-wrap justify-between gap-2 text-xs font-semibold"><span>{message.sender_type === "staff" ? "Bridgeway support" : "Customer"}</span><time className="font-normal opacity-70">{new Date(message.created_at).toLocaleString("en-GB")}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{message.message}</p><SupportPhotoGallery paths={message.attachments ?? []} /></article>)}</div>
       <form className="mt-4 grid gap-3" onSubmit={(event) => { event.preventDefault(); const message = (drafts[row.id] ?? "").trim(); if (message) replyMutation.mutate({ id: row.id, reference: row.public_reference, message, files: photos[row.id] ?? [] }); }}>
-        <label htmlFor={`support-reply-${row.id}`} className="text-sm font-semibold">Reply in Bridgeway<textarea id={`support-reply-${row.id}`} name={`support-reply-${row.id}`} value={drafts[row.id] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: event.target.value }))} required maxLength={3000} rows={3} className="mt-2 block w-full resize-y rounded-md border border-line bg-background px-3 py-2.5 text-sm font-normal outline-none focus:ring-2 focus:ring-primary" /></label>
+        <label htmlFor={`support-reply-${row.id}`} className="text-sm font-semibold">Post reply on support site<textarea id={`support-reply-${row.id}`} name={`support-reply-${row.id}`} value={drafts[row.id] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: event.target.value }))} required maxLength={3000} rows={3} className="mt-2 block w-full resize-y rounded-md border border-line bg-background px-3 py-2.5 text-sm font-normal outline-none focus:ring-2 focus:ring-primary" /></label>
         <SupportPhotoPicker files={photos[row.id] ?? []} onChange={(files) => setPhotos((current) => ({ ...current, [row.id]: files }))} disabled={replyMutation.isPending} />
-        <div className="flex flex-wrap gap-2"><Button type="submit" disabled={replyMutation.isPending || !(drafts[row.id] ?? "").trim()}><Send className="size-4" />Send reply &amp; email customer</Button><Button variant="outline" asChild><a href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent(`Bridgeway support · ${row.public_reference}`)}`}><Mail className="size-4" />Reply by email</a></Button><Button type="button" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, status: row.status === "new" ? "resolved" : "new" })}><Check className="size-4" />{row.status === "new" ? "Mark resolved" : "Reopen"}</Button></div>
+        <Button type="submit" className="w-fit" disabled={replyMutation.isPending || !(drafts[row.id] ?? "").trim()}><Send className="size-4" />Post reply on site</Button>
+      </form>
+      <form className="mt-4 grid gap-3 border-t border-line pt-4" onSubmit={(event) => { event.preventDefault(); const message = (emailDrafts[row.id] ?? "").trim(); if (message) emailMutation.mutate({ id: row.id, message }); }}>
+        <label htmlFor={`support-email-${row.id}`} className="text-sm font-semibold">Email customer privately<textarea id={`support-email-${row.id}`} name={`support-email-${row.id}`} value={emailDrafts[row.id] ?? ""} onChange={(event) => setEmailDrafts((current) => ({ ...current, [row.id]: event.target.value }))} required maxLength={3000} rows={3} className="mt-2 block w-full resize-y rounded-md border border-line bg-background px-3 py-2.5 text-sm font-normal outline-none focus:ring-2 focus:ring-primary" /></label>
+        <p className="text-xs text-muted-foreground">Sent to {row.email}. This email will not appear in the support conversation.</p>
+        <div className="flex flex-wrap gap-2"><Button type="submit" disabled={emailMutation.isPending || !(emailDrafts[row.id] ?? "").trim()}><Mail className="size-4" />Send email only</Button><Button variant="outline" asChild><a href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent(`Bridgeway support · ${row.public_reference}`)}`}><Mail className="size-4" />Open email app</a></Button><Button type="button" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, status: row.status === "new" ? "resolved" : "new" })}><Check className="size-4" />{row.status === "new" ? "Mark resolved" : "Reopen"}</Button></div>
       </form>
     </article>)}</div>
   </section>;

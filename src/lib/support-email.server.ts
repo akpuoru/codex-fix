@@ -31,7 +31,7 @@ export async function sendSupportReplyEmail({
   const text = [
     `Hello ${name.trim() || "there"},`,
     "",
-    "Bridgeway support has replied to your request:",
+    "Bridgeway support sent you a private email about your request:",
     "",
     message.trim(),
     "",

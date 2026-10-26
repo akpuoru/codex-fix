@@ -40,7 +40,7 @@ Seat maps and unpaid holds are airline-dependent. The app only offers search res
 
 ## Admin support reply emails
 
-Admin replies are saved to the support conversation and emailed to the address the customer used on the form. Email is sent through Resend from the server; the API key must never be added to a `VITE_` variable.
+The admin inbox has separate actions for posting a reply to the support conversation and emailing the customer privately. An email sent with **Send email only** goes to the address used on the support form and is not added to the site conversation. Email is sent through Resend from the server; the API key must never be added to a `VITE_` variable.
 
 Before enabling email replies:
 
@@ -48,4 +48,4 @@ Before enabling email replies:
 2. In Cloudflare Workers & Pages, add `RESEND_API_KEY` as a server-side secret.
 3. Add `SUPPORT_EMAIL_FROM` as a server-side variable, using a sender on the verified domain, for example `Bridgeway Support <support@your-verified-domain.com>`.
 4. Optionally set `SUPPORT_EMAIL_REPLY_TO` to the support mailbox where customer email replies should go.
-5. Redeploy the app. Until these values are set, admin replies are still saved in the support conversation and the dashboard reports that the email could not be sent.
+5. Redeploy the app. Until these values are set, site replies still post to the support conversation, while email-only replies are not sent or added to the conversation.
