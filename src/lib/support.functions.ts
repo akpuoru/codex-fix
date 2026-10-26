@@ -46,8 +46,17 @@ export const submitSupport = createServerFn({ method: "POST" })
   });
 
 const conversationSchema = z.object({ reference: z.string().trim().regex(/^\d{16}$/, "Enter the 16-digit support reference.") });
-const replySchema = z.object({ reference: z.string().trim().regex(/^\d{16}$/, "Enter the 16-digit support reference."), message: z.string().trim().min(1).max(3000) });
-const adminReplySchema = z.object({ id: z.string().uuid(), message: z.string().trim().min(1).max(3000) });
+const attachmentSchema = z.array(z.string().max(128)).max(3).default([]);
+const replySchema = z.object({
+  reference: z.string().trim().regex(/^\d{16}$/, "Enter the 16-digit support reference."),
+  message: z.string().trim().min(1).max(3000),
+  attachments: attachmentSchema,
+});
+const adminReplySchema = z.object({
+  id: z.string().uuid(),
+  message: z.string().trim().min(1).max(3000),
+  attachments: attachmentSchema,
+});
 
 export const getSupportConversation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => conversationSchema.parse(input))
@@ -64,6 +73,7 @@ export const replySupportConversation = createServerFn({ method: "POST" })
     const { error } = await createPublicSupportClient().rpc("reply_support_conversation", {
       _reference: data.reference,
       _message: data.message,
+      _attachments: data.attachments,
     });
     if (error) throw new Error(error.message.includes("Too many replies") ? "Too many replies. Please try again later." : "Your reply could not be sent. Check the reference and try again.");
     return { ok: true };
@@ -79,7 +89,7 @@ export const listSupport = createServerFn({ method: "GET" })
     if (!data?.length) return [];
     const { data: messages, error: messagesError } = await context.supabase
       .from("support_messages")
-      .select("id, request_id, sender_type, message, created_at")
+      .select("id, request_id, sender_type, message, created_at, attachments")
       .in("request_id", data.map((row) => row.id))
       .order("created_at", { ascending: true });
     if (messagesError) throw new Error("Unable to load support replies.");
@@ -93,6 +103,7 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
     const { error } = await context.supabase.rpc("admin_reply_support_conversation", {
       _request: data.id,
       _message: data.message,
+      _attachments: data.attachments,
     });
     if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to send this reply.");
     return { ok: true };

@@ -392,6 +392,7 @@ export type Database = {
       }
       support_messages: {
         Row: {
+          attachments: string[]
           created_at: string
           id: string
           message: string
@@ -399,6 +400,7 @@ export type Database = {
           sender_type: string
         }
         Insert: {
+          attachments?: string[]
           created_at?: string
           id?: string
           message: string
@@ -406,6 +408,7 @@ export type Database = {
           sender_type: string
         }
         Update: {
+          attachments?: string[]
           created_at?: string
           id?: string
           message?: string
@@ -629,6 +632,7 @@ export type Database = {
         Returns: {
           message: string | null
           message_created_at: string | null
+          attachments: string[]
           name: string
           reference: string
           request_created_at: string
@@ -639,11 +643,11 @@ export type Database = {
         }[]
       }
       reply_support_conversation: {
-        Args: { _message: string; _reference: string }
+        Args: { _attachments?: string[]; _message: string; _reference: string }
         Returns: string
       }
       admin_reply_support_conversation: {
-        Args: { _message: string; _request: string }
+        Args: { _attachments?: string[]; _message: string; _request: string }
         Returns: string
       }
       submit_support_request: {

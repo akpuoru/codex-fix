@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { LoaderCircle, MessageSquareText, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getSupportConversation, replySupportConversation } from "@/lib/support.functions";
+import { removeSupportPhotos, SupportPhotoGallery, SupportPhotoPicker, uploadSupportPhotos } from "@/components/support-photo-tools";
 
 type ConversationRow = {
   reference: string;
@@ -14,6 +15,7 @@ type ConversationRow = {
   sender_type: string | null;
   message: string | null;
   message_created_at: string | null;
+  attachments: string[];
 };
 
 export function SupportConversationLookup() {
@@ -22,6 +24,7 @@ export function SupportConversationLookup() {
   const [reference, setReference] = useState("");
   const [rows, setRows] = useState<ConversationRow[] | null>(null);
   const [draft, setDraft] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -44,11 +47,17 @@ export function SupportConversationLookup() {
     event.preventDefault();
     setPending(true);
     setError("");
+    let uploaded: string[] = [];
+    let messageSaved = false;
     try {
-      await sendReply({ data: { reference: reference.trim(), message: draft.trim() } });
+      uploaded = await uploadSupportPhotos(reference.trim(), photos);
+      await sendReply({ data: { reference: reference.trim(), message: draft.trim(), attachments: uploaded } });
+      messageSaved = true;
       setDraft("");
+      setPhotos([]);
       await loadConversation(reference.trim());
     } catch (err) {
+      if (!messageSaved && uploaded.length) await removeSupportPhotos(uploaded);
       setError(err instanceof Error ? err.message : "Your reply could not be sent.");
     } finally {
       setPending(false);
@@ -77,9 +86,11 @@ export function SupportConversationLookup() {
       <div className="mt-4 space-y-3">{messages.map((row, index) => <article key={`${row.reference}-${row.message_created_at}-${index}`} className={`rounded-md p-4 ${row.sender_type === "staff" ? "bg-secondary text-secondary-foreground" : "bg-muted/50"}`}>
         <div className="flex flex-wrap justify-between gap-2 text-xs font-semibold"><span>{row.sender_type === "staff" ? "Bridgeway support" : "You"}</span><time className="font-normal opacity-70">{new Date(row.message_created_at!).toLocaleString("en-GB")}</time></div>
         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{row.message}</p>
+        <SupportPhotoGallery paths={row.attachments ?? []} />
       </article>)}</div>
       <form className="mt-4 grid gap-3" onSubmit={handleReply}>
         <label htmlFor="support-reply" className="text-sm font-semibold">Your reply<textarea id="support-reply" name="support-reply" value={draft} onChange={(event) => setDraft(event.target.value)} required maxLength={3000} rows={3} className="mt-2 block w-full resize-y rounded-md border border-line bg-background px-3 py-2.5 text-sm font-normal outline-none focus:ring-2 focus:ring-primary" /></label>
+        <SupportPhotoPicker files={photos} onChange={setPhotos} disabled={pending} />
         <Button type="submit" disabled={pending || !draft.trim()} className="gap-2 sm:justify-self-start"><Send className="size-4" />Send reply</Button>
       </form>
     </div>}
