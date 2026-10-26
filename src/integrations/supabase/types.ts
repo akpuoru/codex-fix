@@ -390,6 +390,38 @@ export type Database = {
         }
         Relationships: []
       }
+      support_messages: {
+        Row: {
+          created_at: string
+          id: string
+          message: string
+          request_id: string
+          sender_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message: string
+          request_id: string
+          sender_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          request_id?: string
+          sender_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_messages_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "support_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_requests: {
         Row: {
           channel: string
@@ -589,6 +621,28 @@ export type Database = {
         Returns: string
       }
       start_live_chat: { Args: never; Returns: string }
+      get_support_conversation: {
+        Args: { _request: string }
+        Returns: {
+          message: string | null
+          message_created_at: string | null
+          name: string
+          request_created_at: string
+          request_id: string
+          sender_type: string | null
+          status: string
+          topic: string
+          tracking_number: string | null
+        }[]
+      }
+      reply_support_conversation: {
+        Args: { _message: string; _request: string }
+        Returns: string
+      }
+      admin_reply_support_conversation: {
+        Args: { _message: string; _request: string }
+        Returns: string
+      }
       submit_support_request: {
         Args: {
           _channel: string

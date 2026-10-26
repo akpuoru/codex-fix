@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, Send } from "lucide-react";
+import { CheckCircle2, Copy, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { submitSupport } from "@/lib/support.functions";
 
@@ -12,8 +13,8 @@ export function SupportForm({ channel = "contact" }: { channel?: "contact" | "ch
   if (reference) return <div className="py-10 text-center" role="status">
     <CheckCircle2 className="mx-auto size-10 text-success" />
     <h3 className="mt-4 font-display text-xl font-bold">Message received</h3>
-    <p className="mt-3 text-sm leading-6 text-muted-foreground">Your request is in our support inbox. A team member can contact you using the email you provided.</p>
-    <p className="mt-4 text-xs text-muted-foreground">Reference: {reference.slice(0, 8).toUpperCase()}</p>
+    <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-muted-foreground">Your message is now a private support conversation. Save the full reference below, then enter it in the conversation box to read and reply to Bridgeway.</p>
+    <div className="mx-auto mt-4 flex max-w-lg flex-wrap items-center justify-center gap-2 rounded-md border border-line bg-muted/40 p-3"><code className="break-all text-xs">{reference}</code><Button type="button" size="sm" variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(reference); toast.success("Support reference copied."); } catch { toast.error("Copy failed. Select the reference and copy it manually."); } }}><Copy className="size-3" />Copy</Button></div>
     <Button variant="outline" className="mt-6" onClick={() => setReference("")}>Send another message</Button>
   </div>;
   return <form className="grid gap-4" onSubmit={async (event) => {

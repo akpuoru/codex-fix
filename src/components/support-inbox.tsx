@@ -1,21 +1,24 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Mail, Check, Inbox } from "lucide-react";
+import { Mail, Check, Inbox, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { listSupport, resolveSupport } from "@/lib/support.functions";
+import { adminReplySupportConversation, listSupport, resolveSupport } from "@/lib/support.functions";
 import { useSession } from "@/hooks/use-session";
 import { AdminLiveChats } from "@/components/admin-live-chats";
 
 export function SupportInbox() {
   const list = useServerFn(listSupport);
   const resolve = useServerFn(resolveSupport);
+  const reply = useServerFn(adminReplySupportConversation);
   const { user } = useSession();
   const qc = useQueryClient();
   const [filter, setFilter] = useState("new");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const query = useQuery({ queryKey: ["support-inbox", user?.id], queryFn: () => list(), enabled: !!user, refetchInterval: 30000 });
   const mutation = useMutation({ mutationFn: (data: { id: string; status: "new" | "resolved" }) => resolve({ data }), onSuccess: () => qc.invalidateQueries({ queryKey: ["support-inbox"] }), onError: () => toast.error("Unable to update this request.") });
+  const replyMutation = useMutation({ mutationFn: (data: { reference: string; message: string }) => reply({ data }), onSuccess: (_result, data) => { setDrafts((current) => ({ ...current, [data.reference]: "" })); void qc.invalidateQueries({ queryKey: ["support-inbox"] }); toast.success("Reply added to the conversation."); }, onError: () => toast.error("Unable to send this reply.") });
   const rows = (query.data ?? []).filter((row) => filter === "all" || row.status === filter);
   return <section className="mt-6">
     <AdminLiveChats />
@@ -26,8 +29,11 @@ export function SupportInbox() {
     <div className="mt-5 grid gap-4">{rows.map((row) => <article key={row.id} className="rounded-md border border-line bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-sans text-base font-semibold">{row.name}</h3><div className="mt-1 text-sm text-muted-foreground">{row.email}</div></div><span className="text-xs text-muted-foreground">{new Date(row.created_at).toLocaleString("en-GB")} · {row.channel} · {row.status}</span></div>
       <div className="mt-3 text-xs font-semibold uppercase text-primary">{row.topic} {row.tracking_number && `· ${row.tracking_number}`}</div>
-      <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{row.message}</p>
-      <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" asChild><a href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent(`Bridgeway support · ${row.id.slice(0,8).toUpperCase()}`)}`}><Mail className="size-4" />Reply by email</a></Button><Button variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, status: row.status === "new" ? "resolved" : "new" })}><Check className="size-4" />{row.status === "new" ? "Mark resolved" : "Reopen"}</Button></div>
+      <div className="mt-4 space-y-3">{row.messages.map((message) => <article key={message.id} className={`rounded-md p-4 ${message.sender_type === "staff" ? "bg-secondary text-secondary-foreground" : "bg-muted/50"}`}><div className="flex flex-wrap justify-between gap-2 text-xs font-semibold"><span>{message.sender_type === "staff" ? "Bridgeway support" : "Customer"}</span><time className="font-normal opacity-70">{new Date(message.created_at).toLocaleString("en-GB")}</time></div><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{message.message}</p></article>)}</div>
+      <form className="mt-4 grid gap-3" onSubmit={(event) => { event.preventDefault(); const message = (drafts[row.id] ?? "").trim(); if (message) replyMutation.mutate({ reference: row.id, message }); }}>
+        <label htmlFor={`support-reply-${row.id}`} className="text-sm font-semibold">Reply in Bridgeway<textarea id={`support-reply-${row.id}`} name={`support-reply-${row.id}`} value={drafts[row.id] ?? ""} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: event.target.value }))} required maxLength={3000} rows={3} className="mt-2 block w-full resize-y rounded-md border border-line bg-background px-3 py-2.5 text-sm font-normal outline-none focus:ring-2 focus:ring-primary" /></label>
+        <div className="flex flex-wrap gap-2"><Button type="submit" disabled={replyMutation.isPending || !(drafts[row.id] ?? "").trim()}><Send className="size-4" />Send in-site reply</Button><Button variant="outline" asChild><a href={`mailto:${encodeURIComponent(row.email)}?subject=${encodeURIComponent(`Bridgeway support · ${row.id.slice(0, 8).toUpperCase()}`)}`}><Mail className="size-4" />Reply by email</a></Button><Button type="button" variant="ghost" disabled={mutation.isPending} onClick={() => mutation.mutate({ id: row.id, status: row.status === "new" ? "resolved" : "new" })}><Check className="size-4" />{row.status === "new" ? "Mark resolved" : "Reopen"}</Button></div>
+      </form>
     </article>)}</div>
   </section>;
 }

@@ -5,6 +5,23 @@ import type { Database } from "@/integrations/supabase/types";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseUrl, supabasePublishableKey } from "@/lib/supabase-env";
 
+function createPublicSupportClient() {
+  const key = supabasePublishableKey();
+  const url = supabaseUrl();
+  if (!key || !url) throw new Error("Support is temporarily unavailable. Please try again.");
+  return createClient<Database>(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      fetch: (input, init) => {
+        const headers = new Headers(init?.headers);
+        if (key.startsWith("sb_") && headers.get("Authorization") === `Bearer ${key}`) headers.delete("Authorization");
+        headers.set("apikey", key);
+        return fetch(input, { ...init, headers });
+      },
+    },
+  });
+}
+
 const schema = z.object({
   name: z.string().trim().min(2).max(100),
   email: z.string().trim().email().max(255),
@@ -19,24 +36,36 @@ export const submitSupport = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => schema.parse(input))
   .handler(async ({ data }) => {
     if (data.website) throw new Error("Unable to send this message.");
-    const key = supabasePublishableKey();
-    const url = supabaseUrl();
-    if (!key || !url) throw new Error("Support is temporarily unavailable. Please try again.");
-    const client = createClient<Database>(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: (input, init) => {
-        const headers = new Headers(init?.headers);
-        if (key.startsWith("sb_") && headers.get("Authorization") === `Bearer ${key}`) headers.delete("Authorization");
-        headers.set("apikey", key);
-        return fetch(input, { ...init, headers });
-      } },
-    });
+    const client = createPublicSupportClient();
     const { data: id, error } = await client.rpc("submit_support_request", {
       _name: data.name, _email: data.email, _topic: data.topic,
       _tracking: data.tracking, _message: data.message, _channel: data.channel,
     });
     if (error) throw new Error(error.message.includes("Too many messages") ? "Too many messages. Please try again later." : "Your message could not be sent. Please try again.");
     return { id };
+  });
+
+const conversationSchema = z.object({ reference: z.string().uuid() });
+const replySchema = z.object({ reference: z.string().uuid(), message: z.string().trim().min(1).max(3000) });
+
+export const getSupportConversation = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => conversationSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await createPublicSupportClient().rpc("get_support_conversation", { _request: data.reference });
+    if (error) throw new Error("Unable to load this support conversation. Check the reference and try again.");
+    if (!rows?.length) throw new Error("We couldn't find a conversation with that reference.");
+    return rows;
+  });
+
+export const replySupportConversation = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => replySchema.parse(input))
+  .handler(async ({ data }) => {
+    const { error } = await createPublicSupportClient().rpc("reply_support_conversation", {
+      _request: data.reference,
+      _message: data.message,
+    });
+    if (error) throw new Error(error.message.includes("Too many replies") ? "Too many replies. Please try again later." : "Your reply could not be sent. Check the reference and try again.");
+    return { ok: true };
   });
 
 export const listSupport = createServerFn({ method: "GET" })
@@ -46,7 +75,26 @@ export const listSupport = createServerFn({ method: "GET" })
     if (roleError || !admin) throw new Error("Admin access required.");
     const { data, error } = await context.supabase.from("support_requests").select("*").order("created_at", { ascending: false }).limit(200);
     if (error) throw new Error("Unable to load messages.");
-    return data;
+    if (!data?.length) return [];
+    const { data: messages, error: messagesError } = await context.supabase
+      .from("support_messages")
+      .select("id, request_id, sender_type, message, created_at")
+      .in("request_id", data.map((row) => row.id))
+      .order("created_at", { ascending: true });
+    if (messagesError) throw new Error("Unable to load support replies.");
+    return data.map((row) => ({ ...row, messages: (messages ?? []).filter((message) => message.request_id === row.id) }));
+  });
+
+export const adminReplySupportConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => replySchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("admin_reply_support_conversation", {
+      _request: data.reference,
+      _message: data.message,
+    });
+    if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to send this reply.");
+    return { ok: true };
   });
 
 export const resolveSupport = createServerFn({ method: "POST" })

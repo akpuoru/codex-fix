@@ -39,7 +39,6 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -59,15 +58,11 @@ function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: {
-            emailRedirectTo: window.location.origin,
-            data: { full_name: fullName },
-          },
         });
         if (error) throw error;
         if (!data.session) {
           setSent(true);
-          toast.success("Check your email to confirm your account.");
+          toast.message("Email confirmation is still enabled for this Supabase project.");
           return;
         }
         navigate({ to: target, replace: true });
@@ -114,25 +109,12 @@ function AuthPage() {
 
           <div className="mt-8 rounded-xl bg-card p-6 ring-1 ring-line">
             {sent ? (
-              <p className="font-mono text-sm">
-                Confirmation sent to {email}. Click the link, then sign in.
-              </p>
+              <div className="space-y-3 text-sm leading-6">
+                <p>Supabase is still requiring email confirmation for {email}.</p>
+                <p>To let new users sign in immediately, turn off <strong>Confirm Email</strong> in the Email provider settings for this project, then try registering again.</p>
+              </div>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
-                {mode === "signup" && (
-                  <div>
-                    <label className="label-mono" htmlFor="name">
-                      Full name
-                    </label>
-                    <input
-                      id="name"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      required
-                      className={inputCls}
-                    />
-                  </div>
-                )}
                 <div>
                   <label className="label-mono" htmlFor="email">
                     Email

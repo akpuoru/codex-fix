@@ -3,6 +3,7 @@ import { ArrowRight, PackageSearch, Truck, Building2 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SupportForm } from "@/components/support-form";
+import { SupportConversationLookup } from "@/components/support-conversation-lookup";
 
 export const Route = createFileRoute("/contact")({
   head: () => ({ meta: [
@@ -33,7 +34,7 @@ function Contact() {
             <div className="flex items-start gap-4 py-5"><Building2 className="mt-1 size-6 shrink-0 text-primary" /><div><div className="font-semibold">Business shipping</div><p className="mt-1 text-sm leading-6 text-muted-foreground">Select “Business & freight enquiry” for commercial shipments and regular shipping needs.</p></div></div>
           </div>
         </div>
-        <div><div className="mb-7 border-b border-line pb-5"><h2 className="font-display text-2xl font-bold">Send an enquiry</h2><p className="mt-2 text-sm text-muted-foreground">We’ll use your email address to follow up.</p></div><SupportForm /></div>
+        <div className="space-y-10"><div><div className="mb-7 border-b border-line pb-5"><h2 className="font-display text-2xl font-bold">Send an enquiry</h2><p className="mt-2 text-sm text-muted-foreground">You can continue the conversation here with the private reference we give you.</p></div><SupportForm /></div><SupportConversationLookup /></div>
       </section>
     </main><SiteFooter />
   </div>;
