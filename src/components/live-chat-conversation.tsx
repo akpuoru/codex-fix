@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send, CheckCheck, MessageCircle } from "lucide-react";
+import { Send, CheckCheck, MessageCircle, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
@@ -29,6 +29,10 @@ export function LiveChatConversation({ threadId, staff = false }: { threadId: st
     const { error } = await supabase.rpc("send_live_message", { _thread: threadId, _body: body, _staff: staff });
     if (error) throw error;
   }, onSuccess: () => { setDraft(""); setError(""); void qc.invalidateQueries({ queryKey: key }); void qc.invalidateQueries({ queryKey: ["live-chat-threads"] }); }, onError: (err) => setError(err.message) });
+  const deleteMutation = useMutation({ mutationFn: async (messageId: string) => {
+    const { error } = await supabase.rpc("admin_delete_live_chat_message", { _message: messageId });
+    if (error) throw error;
+  }, onSuccess: () => { setError(""); void qc.invalidateQueries({ queryKey: key }); void qc.invalidateQueries({ queryKey: ["live-chat-threads"] }); }, onError: () => setError("Unable to delete this chat message.") });
   return <div className="flex min-h-0 flex-col">
     <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground"><span className={`size-2 rounded-full ${connected ? "bg-success" : "bg-caution"}`} />{connected ? "Live connection" : "Checking for updates…"}</div>
     <div role="log" aria-label="Chat messages" aria-live="polite" className="h-[min(42dvh,360px)] overflow-y-auto rounded-md border border-line bg-background p-4">
@@ -39,7 +43,10 @@ export function LiveChatConversation({ threadId, staff = false }: { threadId: st
         const own = staff ? message.is_staff : !message.is_staff;
         return <div key={message.id} className={`mb-4 flex flex-col ${own ? "items-end" : "items-start"}`}>
           <span className="mb-1 text-[11px] text-muted-foreground">{message.is_staff ? "Bridgeway team" : staff ? "Customer" : "You"}</span>
-          <div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-6 ${own ? "bg-primary text-primary-foreground" : "border border-line bg-card text-card-foreground"}`}>{message.body}</div>
+          <div className="flex items-center gap-2">
+            <div className={`max-w-[88%] whitespace-pre-wrap break-words rounded-md px-3 py-2 text-sm leading-6 ${own ? "bg-primary text-primary-foreground" : "border border-line bg-card text-card-foreground"}`}>{message.body}</div>
+            {staff && <Button type="button" size="icon" variant="ghost" className="size-7 text-muted-foreground hover:text-destructive" aria-label="Delete this chat message" title="Delete this chat message" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm("Permanently delete this message from the live chat?")) deleteMutation.mutate(message.id); }}><Trash2 className="size-3.5" /></Button>}
+          </div>
           <span className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground">{new Date(message.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}{own && <CheckCheck className="size-3" aria-label="Sent" />}</span>
         </div>;
       })}<div ref={end} />

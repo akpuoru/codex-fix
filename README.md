@@ -42,6 +42,8 @@ Seat maps and unpaid holds are airline-dependent. The app only offers search res
 
 The admin inbox has separate actions for posting a reply to the support conversation and emailing the customer privately. An email sent with **Send email only** goes to the address used on the support form and is not added to the site conversation. Email is sent through Resend from the server; the API key must never be added to a `VITE_` variable.
 
+Admins can delete a complete guest support conversation, an individual message in that conversation, or an individual live-chat message. Apply `drizzle/migrations/0017_admin_delete_support.sql` to the connected Supabase database before using these controls. The migration restricts deletion to admins and permits cleanup of attached support photos.
+
 Before enabling email replies:
 
 1. Verify a sending domain in Resend and create an API key.

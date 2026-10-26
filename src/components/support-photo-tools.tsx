@@ -41,7 +41,8 @@ export async function uploadSupportPhotos(reference: string, files: File[]) {
 
 export async function removeSupportPhotos(paths: string[]) {
   if (!paths.length) return;
-  await supabase.storage.from(BUCKET).remove(paths);
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if (error) throw new Error("Could not remove the support photos.");
 }
 
 export function SupportPhotoPicker({

@@ -650,6 +650,18 @@ export type Database = {
         Args: { _attachments?: string[]; _message: string; _request: string }
         Returns: string
       }
+      admin_delete_support_message: {
+        Args: { _message: string }
+        Returns: string[]
+      }
+      admin_delete_support_conversation: {
+        Args: { _request: string }
+        Returns: string[]
+      }
+      admin_delete_live_chat_message: {
+        Args: { _message: string }
+        Returns: undefined
+      }
       submit_support_request: {
         Args: {
           _channel: string

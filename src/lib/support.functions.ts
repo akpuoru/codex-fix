@@ -61,6 +61,7 @@ const adminEmailSchema = z.object({
   id: z.string().uuid(),
   message: z.string().trim().min(1).max(3000),
 });
+const supportMessageIdSchema = z.object({ id: z.string().uuid() });
 
 export const getSupportConversation = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => conversationSchema.parse(input))
@@ -144,6 +145,24 @@ export const adminEmailSupportCustomer = createServerFn({ method: "POST" })
       console.error("[Support email] Email-only reply failed.", emailError);
       return { emailSent: false, emailIssue: "provider_error" as const };
     }
+  });
+
+export const adminDeleteSupportMessage = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => supportMessageIdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: attachments, error } = await context.supabase.rpc("admin_delete_support_message", { _message: data.id });
+    if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to delete this support message.");
+    return { attachments: attachments ?? [] };
+  });
+
+export const adminDeleteSupportConversation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => supportMessageIdSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: attachments, error } = await context.supabase.rpc("admin_delete_support_conversation", { _request: data.id });
+    if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to delete this support conversation.");
+    return { attachments: attachments ?? [] };
   });
 
 export const resolveSupport = createServerFn({ method: "POST" })
