@@ -37,3 +37,15 @@ Before enabling live reservations:
 4. Use a Duffel live token only after the Duffel account is ready for live bookings. A test token does not create live airline reservations.
 
 Seat maps and unpaid holds are airline-dependent. The app only offers search results that Duffel reports can be held without immediate payment; available seats and any seat charges are shown when the airline supplies them.
+
+## Admin support reply emails
+
+Admin replies are saved to the support conversation and emailed to the address the customer used on the form. Email is sent through Resend from the server; the API key must never be added to a `VITE_` variable.
+
+Before enabling email replies:
+
+1. Verify a sending domain in Resend and create an API key.
+2. In Cloudflare Workers & Pages, add `RESEND_API_KEY` as a server-side secret.
+3. Add `SUPPORT_EMAIL_FROM` as a server-side variable, using a sender on the verified domain, for example `Bridgeway Support <support@your-verified-domain.com>`.
+4. Optionally set `SUPPORT_EMAIL_REPLY_TO` to the support mailbox where customer email replies should go.
+5. Redeploy the app. Until these values are set, admin replies are still saved in the support conversation and the dashboard reports that the email could not be sent.

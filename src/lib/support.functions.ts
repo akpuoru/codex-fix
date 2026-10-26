@@ -100,13 +100,37 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => adminReplySchema.parse(input))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.rpc("admin_reply_support_conversation", {
+    const { data: messageId, error } = await context.supabase.rpc("admin_reply_support_conversation", {
       _request: data.id,
       _message: data.message,
       _attachments: data.attachments,
     });
     if (error) throw new Error(error.message.includes("Admin access required") ? "Admin access required." : "Unable to send this reply.");
-    return { ok: true };
+
+    try {
+      const { data: request, error: requestError } = await context.supabase
+        .from("support_requests")
+        .select("name, email, public_reference")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (requestError || !request) {
+        console.error("[Support email] Could not load the support request recipient.", requestError?.message);
+        return { ok: true, emailSent: false, emailIssue: "provider_error" as const };
+      }
+
+      const { sendSupportReplyEmail } = await import("@/lib/support-email.server");
+      const emailResult = await sendSupportReplyEmail({
+        to: request.email,
+        name: request.name,
+        reference: request.public_reference,
+        message: data.message,
+        idempotencyKey: typeof messageId === "string" ? messageId : undefined,
+      });
+      return { ok: true, emailSent: emailResult.sent, emailIssue: emailResult.issue };
+    } catch (emailError) {
+      console.error("[Support email] Notification failed after the reply was saved.", emailError);
+      return { ok: true, emailSent: false, emailIssue: "provider_error" as const };
+    }
   });
 
 export const resolveSupport = createServerFn({ method: "POST" })
