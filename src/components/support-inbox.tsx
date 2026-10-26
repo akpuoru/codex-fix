@@ -43,10 +43,19 @@ export function SupportInbox() {
       toast.success("Email sent. It was not added to the support conversation.");
     } else if (result.action === "email" && result.emailIssue === "not_configured") {
       toast.error("Email is not configured. Add RESEND_API_KEY and SUPPORT_EMAIL_FROM in Cloudflare.");
+    } else if (result.action === "email" && result.emailIssue === "permission_error") {
+      toast.error("Could not verify admin access to send this email. Refresh the dashboard and try again.");
+    } else if (result.action === "email" && result.emailIssue === "request_error") {
+      toast.error("Could not load this customer's support record. Check the Cloudflare Worker logs.");
+    } else if (result.action === "email" && result.emailIssue === "request_not_found") {
+      toast.error("This support conversation could not be found. Refresh the dashboard and try again.");
     } else {
       toast.error("Email could not be sent. It was not added to the support conversation.");
     }
-  }, onError: () => toast.error("Unable to email this customer.") });
+  }, onError: (error) => {
+    console.error("[Support inbox] Email action failed before returning a result.", error);
+    toast.error(error instanceof Error ? `Unable to email this customer: ${error.message}` : "Unable to email this customer.");
+  } });
   const deleteMessageMutation = useMutation({ mutationFn: async (id: string) => {
     const result = await deleteMessage({ data: { id } });
     let photosRemoved = true;

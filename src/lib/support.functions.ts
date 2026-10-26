@@ -104,7 +104,10 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (data.action === "email") {
       const { data: admin, error: roleError } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
-      if (roleError || !admin) throw new Error("Admin access required.");
+      if (roleError || !admin) {
+        console.error("[Support email] Admin authorization check failed.", roleError?.message);
+        return { action: "email" as const, emailSent: false, emailIssue: "permission_error" as const };
+      }
 
       const { data: request, error: requestError } = await context.supabase
         .from("support_requests")
@@ -113,7 +116,11 @@ export const adminReplySupportConversation = createServerFn({ method: "POST" })
         .maybeSingle();
       if (requestError || !request) {
         console.error("[Support email] Could not load the support request recipient.", requestError?.message);
-        throw new Error("Unable to load this customer's email address.");
+        return {
+          action: "email" as const,
+          emailSent: false,
+          emailIssue: requestError ? "request_error" as const : "request_not_found" as const,
+        };
       }
 
       try {
