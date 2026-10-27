@@ -51,3 +51,12 @@ Before enabling email replies:
 3. Add `SUPPORT_EMAIL_FROM` as a server-side variable, using a sender on the verified domain, for example `Bridgeway Support <support@your-verified-domain.com>`.
 4. Optionally set `SUPPORT_EMAIL_REPLY_TO` to the support mailbox where customer email replies should go.
 5. Redeploy the app. Until these values are set, site replies still post to the support conversation, while email-only replies are not sent or added to the conversation.
+
+## Guest WhatsApp and Telegram support
+
+The public contact page and floating support dialog show direct WhatsApp and Telegram links to visitors, including people who are not signed in. The defaults below are Bridgeway's public support contacts; they can be overridden with build-time variables in Cloudflare Workers & Pages:
+
+- `VITE_SUPPORT_WHATSAPP_NUMBER`: support's WhatsApp number in international format. Default: `+553173007351`.
+- `VITE_SUPPORT_TELEGRAM_URL`: support's Telegram username or an HTTPS `t.me` link. Default: `https://t.me/bridgewaytrack`.
+
+If an override is blank, the default contact is used. These are public contact details, not secrets.
