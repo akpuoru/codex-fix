@@ -20,17 +20,21 @@ function getTelegramUrl(value: string): string | undefined {
 
 const telegramUrl = getTelegramUrl(telegramContact);
 
-export function SupportChannels({ className = "" }: { className?: string }) {
+export function SupportChannels({ className = "", floating = false }: { className?: string; floating?: boolean }) {
   if (!whatsappNumber && !telegramUrl) return null;
 
   return (
-    <div className={`flex flex-wrap gap-2 ${className}`} aria-label="Message Bridgeway support">
+    <div className={`${floating ? "flex flex-col items-end gap-2" : "flex flex-wrap gap-2"} ${className}`} aria-label="Message Bridgeway support">
       {whatsappNumber && (
         <a
           href={`https://wa.me/${whatsappNumber}?text=${encodeURIComponent("Hello Bridgeway Support, I need help.")}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+          aria-label="Message Bridgeway support on WhatsApp"
+          title="WhatsApp support"
+          className={floating
+            ? "inline-flex min-h-11 items-center gap-2 rounded-full bg-[#25D366] px-4 text-sm font-semibold text-[#073b22] shadow-xl transition-transform hover:scale-105 hover:bg-[#1fb85a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            : "inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"}
         >
           <MessageCircle className="size-4" aria-hidden="true" />
           WhatsApp support
@@ -41,7 +45,11 @@ export function SupportChannels({ className = "" }: { className?: string }) {
           href={telegramUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"
+          aria-label="Message Bridgeway support on Telegram"
+          title="Telegram support"
+          className={floating
+            ? "inline-flex min-h-11 items-center gap-2 rounded-full bg-[#229ED9] px-4 text-sm font-semibold text-[#08324a] shadow-xl transition-transform hover:scale-105 hover:bg-[#1688bf] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            : "inline-flex min-h-10 items-center gap-2 rounded-md border border-line bg-card px-4 py-2 text-sm font-semibold transition-colors hover:bg-muted"}
         >
           <Send className="size-4" aria-hidden="true" />
           Telegram support

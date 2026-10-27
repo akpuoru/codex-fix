@@ -54,7 +54,7 @@ Before enabling email replies:
 
 ## Guest WhatsApp and Telegram support
 
-The public contact page and floating support dialog show direct WhatsApp and Telegram links to visitors, including people who are not signed in. The defaults below are Bridgeway's public support contacts; they can be overridden with build-time variables in Cloudflare Workers & Pages:
+The public contact page and floating support dock show direct WhatsApp and Telegram links to visitors, including people who are not signed in. The defaults below are Bridgeway's public support contacts; they can be overridden with build-time variables in Cloudflare Workers & Pages:
 
 - `VITE_SUPPORT_WHATSAPP_NUMBER`: support's WhatsApp number in international format. Default: `+553173007351`.
 - `VITE_SUPPORT_TELEGRAM_URL`: support's Telegram username or an HTTPS `t.me` link. Default: `https://t.me/bridgewaytrack`.
